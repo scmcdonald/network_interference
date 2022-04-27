@@ -1,0 +1,126 @@
+---
+title: "VAR for Covid Cases"
+author: "Sarah McDonald"
+date: "4/27/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(MASS, exclude = "select")
+library(here)
+library(zoo)
+library(vars)
+library(tseries)
+```
+
+
+```{r}
+df <- read.csv(here("data/us-states.csv"))
+```
+
+For simplicity, start with a subset of northeastern states
+
+```{r}
+states <- data.frame(state.name, state.region)
+northeast_states <- states%>%
+  filter(state.region == "Northeast") %>%
+           pull(state.name)
+```
+
+
+For simplicity, let's look at covid case counts by month
+Our months will start in March 2020
+```{r}
+northeast_df <- df %>%
+  filter(state %in% northeast_states) %>%
+  mutate(date_ym = as.yearmon(substr(date,1, 7), 
+                              format = "%Y-%m")) %>%
+  select(state, cases, date_ym) %>%
+  group_by(date_ym, state) %>%
+  summarize(cases = sum(cases), .groups = "drop") %>%
+  pivot_wider(names_from = state, values_from = cases) %>%
+  # massachusets is only state to record in feb 2020, 
+  # so start in March 2020
+  drop_na()
+```
+
+Make time series
+
+```{r}
+for(i in northeast_states){
+  
+  state_ts <- ts(northeast_df[[i]],
+          start = c(2020, 3), 
+          end = c(2022, 4), 
+          frequency = 12)
+  
+  assign(paste(str_replace(tolower(i), " ", ""), "ts", sep= "_"), state_ts)
+  
+}
+
+var_data <- do.call(ts.union, mget(paste(str_replace(tolower(northeast_states), " ", ""), "ts", sep= "_")))
+
+```
+
+
+
+```{r}
+cor_matrix <- cor(var_data)
+# I think this is the problem -> 0 with machine precision
+det(cor_matrix)
+```
+
+
+```{r}
+VARselect(var_data)
+var_est <- VAR(y = var_data, p = 2)
+var_est
+coef(var_est) %>%
+  lapply(as.data.frame)
+#can't run this due to singuilarity
+#summary(var_est)
+```
+
+
+Is our data stationary? no. This means there isa trend (this makes sense because of the upward covid cases trend)
+```{r}
+pp_test <- lapply(mget(paste(str_replace(tolower(northeast_states), " ", ""), "ts", sep= "_")), pp.test)
+
+lapply(pp_test, "[[", "p.value") %>%
+  as.data.frame() %>%
+  pivot_longer(everything(), names_to = c("state")) %>%
+  mutate(value = round(value, 3))
+
+# can't run thi due to singualr system
+# serial <- serial.test(var_est, type = "PT.asymptotic")
+# arch.test(var_est, lags.multi = 15, multivariate.only = TRUE)
+# the leading minor of order 6 is not positive definite for normality test
+# Norm1 <- normality.test(var_est, multivariate.only = TRUE)
+#irf_mass <- irf(var_est, impulse = "massachusetts_ts", response = "massachusetts_ts", n.ahead = 20, boot = TRUE)
+# can't run this due to singularity
+#causality(var_est, cause = "newyork_ts")
+
+```
+
+testing for structural breaks
+
+```{r}
+Stability1 <- stability(var_est, type = "OLS-CUSUM")
+#plot(Stability1)
+Stability1$stability$connecticut_ts
+```
+
+
+```{r}
+fevd(var_est)
+```
+
+

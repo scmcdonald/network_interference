@@ -1,0 +1,281 @@
+---
+title: "`vars` Tutorials"
+author: "Sarah McDonald"
+date: "4/22/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = F, 
+                      message = F)
+```
+
+
+```{r}
+library(readxl)
+library(here)
+library(tidyverse)
+library(zoo)
+library(vars)
+library(car)
+```
+
+```{r}
+USMacroSWQ <- read_xlsx(here("data", "us_macro_quarterly.xlsx"), ,
+                         sheet = 1,
+                         col_types = c("text", rep("numeric", 9)))
+
+colnames(USMacroSWQ)[colnames(USMacroSWQ) == "...1"] <- "Date"
+
+# format the date column
+USMacroSWQ$Date <- as.yearqtr(USMacroSWQ$Date, format = "%Y:0%q")
+
+```
+
+
+
+```{r}
+# define GDP as ts object
+GDP <- ts(USMacroSWQ$GDPC96,
+          start = c(1957, 1), 
+          end = c(2013, 4), 
+          frequency = 4)
+
+# define GDP growth as a ts object
+GDPGrowth <- ts(400*log(GDP[-1]/GDP[-length(GDP)]),
+                start = c(1957, 2), 
+                end = c(2013, 4), 
+                frequency = 4)
+
+# 3-months Treasury bill interest rate as a 'ts' object
+TB3MS <- ts(USMacroSWQ$TB3MS,
+            start = c(1957, 1), 
+            end = c(2013, 4), 
+            frequency = 4)
+
+# 10-years Treasury bonds interest rate as a 'ts' object
+TB10YS <- ts(USMacroSWQ$GS10, 
+              start = c(1957, 1), 
+              end = c(2013, 4), 
+              frequency = 4)
+
+# generate the term spread series
+TSpread <- TB10YS - TB3MS
+```
+
+
+
+
+
+```{r}
+# set up data for estimation using `VAR()`
+VAR_data <- window(ts.union(GDPGrowth, TSpread), start = c(1980, 3), end = c(2012, 4))
+
+```
+
+
+```{r}
+# estimate model coefficients using `VAR()`
+VAR_est <- VAR(y = VAR_data, p = 2)
+VAR_est
+```
+
+```{r}
+# obtain the adj. R^2 from the output of 'VAR()'
+summary(VAR_est$varresult$GDPGrowth)$adj.r.squared
+#> [1] 0.2887223
+summary(VAR_est$varresult$TSpread)$adj.r.squared
+#> [1] 0.8254311
+```
+
+```{r}
+
+VAR_EQ1 <- dynlm(GDPGrowth ~ L(GDPGrowth, 1:2) + L(TSpread, 1:2), 
+                 start = c(1981, 1), 
+                 end = c(2012, 4))
+
+VAR_EQ1.0 <-VAR_est$varresult$GDPGrowth
+
+```
+
+
+```{r}
+# Granger causality tests:
+causality(VAR_est, cause = "GDPGrowth", vcov. = sandwich)
+
+causality(VAR_est, cause = "TSpread", vcov. = sandwich)
+```
+
+```{r}
+# compute iterated forecasts for GDP growth and term spread for the next 10 quarters
+
+forecasts <- predict(VAR_est)
+forecasts
+
+# visualize the iterated forecasts
+plot(forecasts)
+```
+
+this part is a bit of from the `dynlm` package results.
+
+```{r}
+VAR_est <- VAR(y = window(VAR_data,  start = c(1981, 1), end = c(2012, 4)), p = 3)
+VAR_est
+resmat <- Bcoef(VAR_est)*0
+resmat[, c(3:7)] <- 1
+
+
+VAR_EQ1_res <-restrict(VAR_est, method="manual", resmat=resmat)
+
+coef(VAR_EQ1_res$varresult$GDPGrowth) %*% c( # intercept
+                           window(GDPGrowth, start = c(2012, 3), end = c(2012, 4))[1], 
+                           window(TSpread, start = c(2012, 3), end = c(2012, 4))[1], window(GDPGrowth, start = c(2012, 3), end = c(2012, 4))[2], 
+                           window(TSpread, start = c(2012, 3), end = c(2012, 4))[2],  1)
+
+coef(VAR_EQ1_res$varresult$TSpread) %*% c( # intercept
+                           window(GDPGrowth, start = c(2012, 3), end = c(2012, 4))[1], 
+                           window(TSpread, start = c(2012, 3), end = c(2012, 4))[1], window(GDPGrowth, start = c(2012, 3), end = c(2012, 4))[2], 
+                           window(TSpread, start = c(2012, 3), end = c(2012, 4))[2],  1)
+
+```
+
+## [Toward Data Science Tutorial](https://towardsdatascience.com/a-deep-dive-on-vector-autoregression-in-r-58767ebb3f06)
+
+I can't find their data so I am using a different dataset from their website.
+
+```{r}
+library(vars)
+library(mFilter)
+library(tseries)
+library(TSstudio)
+library(forecast)
+library(tidyverse)
+```
+
+
+```{r}
+mp <- read.csv(here("data", "SampleVAR.csv"))
+head(mp)
+```
+
+Make time series
+```{r}
+real_gdp_growth <- ts(mp$real_gdp_growth,  start = c(1999,1), frequency = 4)
+
+psei <- ts(mp$psei, start = c(1999,1), frequency = 4)
+
+bsp_rrp <- ts(mp$bsp_rrp,  start = c(1999,1), frequency = 4)
+
+unem <- ts(mp$unem,  start = c(1999,1), frequency = 4)
+```
+
+```{r}
+ts_plot(real_gdp_growth)
+ts_plot(psei)
+ts_plot(bsp_rrp)
+ts_plot(unem)
+```
+
+
+```{r}
+pp.test(real_gdp_growth)
+pp.test(psei)
+pp.test(bsp_rrp)
+pp.test(unem)
+```
+
+
+
+```{r}
+v1 <- cbind(real_gdp_growth, psei, bsp_rrp, unem)
+colnames(v1) <- cbind("real_gdp_growth","psei","bsp_rrp", "unem")
+```
+
+
+```{r}
+lagselect <- VARselect(v1, lag.max = 15, type = "const")
+lagselect$selection
+```
+
+Set to 2 for simplicity
+```{r}
+Model1 <- VAR(v1, p = 2, type = "const", season = NULL, exog = NULL) 
+summary(Model1)
+```
+
+
+
+portmanteau test are available for testing for autocorrelation in the residuals of a model: it tests whether any of a group of autocorrelations of the residual time series are different from zero. [wikipedia](https://en.wikipedia.org/wiki/Portmanteau_test)
+```{r}
+Serial1 <- serial.test(Model1, lags.pt = 5, type = "PT.asymptotic")
+Serial1
+```
+
+The results of the ARCH test signify no degree of heteroscedasticity as we fail to reject the null hypothesis. Therefore, we conclude that there are no ARCH effects in this model. 
+```{r}
+Arch1 <- arch.test(Model1, lags.multi = 15, multivariate.only = TRUE)
+Arch1
+```
+
+Not normal
+
+```{r}
+Norm1 <- normality.test(Model1, multivariate.only = TRUE)
+Norm1
+```
+
+
+structural breaks if equation goes outside of the red lines.
+
+```{r}
+Stability1 <- stability(Model1, type = "OLS-CUSUM")
+plot(Stability1)
+```
+
+Policy Simulations
+
+psei DOES Granger-cause
+	real_gdp_growth bsp_rrp unem
+
+```{r}
+Grangerreal_gdp_growth<- causality(Model1, cause = "real_gdp_growth")
+Grangerreal_gdp_growth
+Grangerpsei <- causality(Model1, cause = "psei")
+Grangerpsei
+Grangerbsp_rrp <- causality(Model1, cause = "bsp_rrp")
+Grangerbsp_rrp
+Grangerunem <- causality(Model1, cause = "unem")
+Grangerunem
+```
+
+
+In economics, and especially in contemporary macroeconomic modeling, impulse response functions are used to describe how the economy reacts over time to exogenous impulses, which economists usually call shocks, and are often modeled in the context of a vector autoregression. [wikipedia](https://en.wikipedia.org/wiki/Impulse_response#:~:text=In%20economics%2C%20and%20especially%20in,context%20of%20a%20vector%20autoregression.)
+
+```{r}
+real_gdp_growthirf <- irf(Model1, impulse = "real_gdp_growth", response = "real_gdp_growth", n.ahead = 20, boot = TRUE)
+plot(real_gdp_growthirf, ylab = "real_gdp_growth", main = "real_gdp_growth's shock to real_gdp_growth")
+
+
+
+pseiirf <- irf(Model1, impulse = "real_gdp_growth", response = "psei", n.ahead = 20, boot = TRUE)
+plot(pseiirf, ylab = "psei", main = "real_gdp_growth's shock to psei")
+
+bsp_rrpirf <- irf(Model1, impulse = "real_gdp_growth", response = "bsp_rrp", n.ahead = 20, boot = TRUE)
+plot(bsp_rrpirf, ylab = "bsp_rrp", main = "real_gdp_growth's shock to bsp_rrp")
+
+unemirf <- irf(Model1, impulse = "real_gdp_growth", response = "unem", n.ahead = 20, boot = TRUE)
+plot(unemirf, ylab = "unem", main = "real_gdp_growth's shock to unem")
+```
+
+The variance decomposition indicates the amount of information each variable contributes to the other variables in the autoregression. [wikipedia](https://en.wikipedia.org/wiki/Variance_decomposition_of_forecast_errors)
+
+```{r}
+FEVD1 <- fevd(Model1, n.ahead = 10)
+FEVD1
+plot(FEVD1)
+```
+
+
+
+
