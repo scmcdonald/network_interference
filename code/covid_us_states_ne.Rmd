@@ -85,9 +85,7 @@ ts_list <- lapply(X = setNames(northeast_states, northeast_states), FUN =  funct
 var_data <- do.call(ts.union, ts_list)
 ```
 
-Next we calculate a correlation between states. I get errors later about singularity and positive definite. 
-So, I calculate the correlation matrix and take the determinant, and find that it is treated as zero by machine precision.
-
+Next we calculate a correlation between states. 
 ```{r}
 cor_matrix <- round(cor(var_data), 3)
 cor_matrix
