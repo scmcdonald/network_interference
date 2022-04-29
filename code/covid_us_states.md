@@ -5,23 +5,25 @@ library(here)
 library(zoo)
 library(vars)
 library(tseries)
+library(ggplot2)
 ```
 
-The data is from the New York Times Covid 19 dataset [available on
-Github](https://github.com/nytimes/covid-19-data).
+The data is from the
+[CDC](https://data.cdc.gov/Case-Surveillance/United-States-COVID-19-Cases-and-Deaths-by-State-o/9mfq-cb36/data).
 
 ``` r
-df <- read.csv(here("data/us-states.csv"))
+df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv")) %>%
+  select(submission_date, state, new_case)
 head(df) 
 ```
 
-    ##         date      state fips cases deaths
-    ## 1 2020-01-21 Washington   53     1      0
-    ## 2 2020-01-22 Washington   53     1      0
-    ## 3 2020-01-23 Washington   53     1      0
-    ## 4 2020-01-24   Illinois   17     1      0
-    ## 5 2020-01-24 Washington   53     1      0
-    ## 6 2020-01-25 California    6     1      0
+    ##   submission_date state new_case
+    ## 1      12/01/2021    ND      589
+    ## 2      12/10/2020    WA     3018
+    ## 3      08/17/2020    MD      503
+    ## 4      03/28/2022    VT      467
+    ## 5      03/18/2020    ME       12
+    ## 6      02/06/2020    NE        0
 
 For simplicity, start with a subset of northeastern states, with counts
 by month starting in March 2020. We will look at Covid cases instead of
@@ -29,32 +31,32 @@ deaths.
 
 ``` r
 # make table of states/regions
-states <- data.frame(state.name, state.region)
-northeast_states <- states %>%
-  filter(state.region == "Northeast") %>%
-           pull(state.name)
-northeast_states
-```
+states <- data.frame(state.name, state.region, state.abb)
+northeast_states_df <- states %>%
+  filter(state.region == "Northeast")
+northeast_states <- northeast_states_df %>%
+  select(state.name) %>%
+  rename("state" = "state.name") %>%
+  pull(state)
 
-    ## [1] "Connecticut"   "Maine"         "Massachusetts" "New Hampshire"
-    ## [5] "New Jersey"    "New York"      "Pennsylvania"  "Rhode Island" 
-    ## [9] "Vermont"
-
-``` r
 # make northeast df
 northeast_df <- df %>%
   # select northeast states only
-  filter(state %in% northeast_states) %>%
-  mutate(date_ym = as.yearmon(substr(date,1, 7), 
-                              format = "%Y-%m")) %>%
+  merge(northeast_states_df, by.x = "state", by.y = "state.abb", all.x = F) %>%
+  select(submission_date, new_case, state.name) %>%
+  rename("state" = "state.name", "date" = "submission_date", "cases" = "new_case") %>%
+  mutate(month = substr(date, 1, 2), 
+         year = substr(date, 7, 10), 
+         date_ym = as.yearmon(paste(month, year, sep ="-"), format = "%m-%Y") ) %>%
   select(state, cases, date_ym) %>%
   group_by(date_ym, state) %>%
   # calculate cases by month
   summarize(cases = sum(cases), .groups = "drop") %>%
-  pivot_wider(names_from = state, values_from = cases) %>%
-  # massachusets is only state to record in feb 2020, 
-  # so start in March 2020
-  drop_na()
+  pivot_wider(names_from = state, values_from = cases) 
+
+# massachusets is only state to record in feb 2020, 
+# so start in March 2020
+northeast_df <- northeast_df[-c(1:2), ]
 ```
 
 Next we convert to a time series object.
@@ -84,32 +86,32 @@ cor_matrix
 ```
 
     ##               Connecticut Maine Massachusetts New Hampshire New Jersey New York
-    ## Connecticut         1.000 0.972         0.997         0.984      0.999    0.995
-    ## Maine               0.972 1.000         0.984         0.996      0.977    0.985
-    ## Massachusetts       0.997 0.984         1.000         0.994      0.998    0.999
-    ## New Hampshire       0.984 0.996         0.994         1.000      0.988    0.994
-    ## New Jersey          0.999 0.977         0.998         0.988      1.000    0.998
-    ## New York            0.995 0.985         0.999         0.994      0.998    1.000
-    ## Pennsylvania        0.997 0.981         0.997         0.990      0.997    0.996
-    ## Rhode Island        0.998 0.980         0.999         0.991      0.998    0.997
-    ## Vermont             0.943 0.988         0.965         0.986      0.952    0.968
+    ## Connecticut         1.000 0.901         0.992         0.937      0.989    0.978
+    ## Maine               0.901 1.000         0.934         0.984      0.901    0.932
+    ## Massachusetts       0.992 0.934         1.000         0.961      0.985    0.989
+    ## New Hampshire       0.937 0.984         0.961         1.000      0.927    0.957
+    ## New Jersey          0.989 0.901         0.985         0.927      1.000    0.981
+    ## New York            0.978 0.932         0.989         0.957      0.981    1.000
+    ## Pennsylvania        0.968 0.941         0.971         0.968      0.952    0.967
+    ## Rhode Island        0.989 0.924         0.989         0.950      0.973    0.962
+    ## Vermont             0.891 0.978         0.928         0.959      0.899    0.913
     ##               Pennsylvania Rhode Island Vermont
-    ## Connecticut          0.997        0.998   0.943
-    ## Maine                0.981        0.980   0.988
-    ## Massachusetts        0.997        0.999   0.965
-    ## New Hampshire        0.990        0.991   0.986
-    ## New Jersey           0.997        0.998   0.952
-    ## New York             0.996        0.997   0.968
-    ## Pennsylvania         1.000        0.996   0.954
-    ## Rhode Island         0.996        1.000   0.960
-    ## Vermont              0.954        0.960   1.000
+    ## Connecticut          0.968        0.989   0.891
+    ## Maine                0.941        0.924   0.978
+    ## Massachusetts        0.971        0.989   0.928
+    ## New Hampshire        0.968        0.950   0.959
+    ## New Jersey           0.952        0.973   0.899
+    ## New York             0.967        0.962   0.913
+    ## Pennsylvania         1.000        0.969   0.899
+    ## Rhode Island         0.969        1.000   0.925
+    ## Vermont              0.899        0.925   1.000
 
 ``` r
 # I think this is the problem -> 0 with machine precision
 print(paste("The determinant is:", det(cor_matrix)))
 ```
 
-    ## [1] "The determinant is: 1.14427799999977e-21"
+    ## [1] "The determinant is: 5.4512722574876e-15"
 
 I use `VARselect` to see the information criteria for different lags.
 All agree that the lag should be 2.
@@ -124,10 +126,10 @@ VARselect(var_data)
     ## 
     ## $criteria
     ##                   1    2    3    4    5    6    7    8    9   10
-    ## AIC(n) 1.123237e+02 -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf
-    ## HQ(n)  1.125463e+02 -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf
-    ## SC(n)  1.166695e+02 -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf
-    ## FPE(n) 4.237992e+49    0    0    0    0    0    0    0    0    0
+    ## AIC(n) 5.465922e+01 -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf
+    ## HQ(n)  5.488176e+01 -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf
+    ## SC(n)  5.900503e+01 -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf -Inf
+    ## FPE(n) 3.835143e+24    0    0    0    0    0    0    0    0    0
 
 VAR does the estimation of VAR with OLS.
 
@@ -147,40 +149,40 @@ summary(var_est$varresult$Connecticut)
     ## lm(formula = y ~ -1 + ., data = datamat)
     ## 
     ## Residuals:
-    ##         1         2         3         4         5         6         7         8 
-    ##  108171.3  -28467.4 -601083.1  222907.8  214054.9 -178097.5  370249.5  -52997.5 
-    ##         9        10        11        12        13        14        15        16 
-    ##    4231.5  -80468.5   28048.4  -33810.1    8099.2  -91992.1 -296267.8  220559.2 
-    ##        17        18        19        20        21        22        23        24 
-    ##  -28306.2  428988.6    -799.6 -414066.1  238905.2  -66067.5   55272.6  -27064.8 
+    ##        1        2        3        4        5        6        7        8 
+    ##  -1945.3  -1027.5  -1476.4  -9836.2  -1036.9   3293.3  10316.6  -2088.1 
+    ##        9       10       11       12       13       14       15       16 
+    ##   1131.5  -3217.4   2338.1   4772.1  -9419.1  11707.5 -14930.2   2864.9 
+    ##       17       18       19       20       21       22       23       24 
+    ##  10408.6   1647.0  -2004.7   -124.9   1956.0  -1107.0    516.7  -2738.6 
     ## 
     ## Coefficients:
     ##                    Estimate Std. Error t value Pr(>|t|)  
-    ## Connecticut.l1   -3.203e+00  1.036e+01  -0.309   0.7697  
-    ## Maine.l1          3.093e+00  5.012e+00   0.617   0.5642  
-    ## Massachusetts.l1 -2.920e+00  2.762e+00  -1.057   0.3389  
-    ## New.Hampshire.l1  1.855e+01  1.850e+01   1.003   0.3620  
-    ## New.Jersey.l1     4.197e-01  1.336e+00   0.314   0.7660  
-    ## New.York.l1      -3.585e-01  7.900e-01  -0.454   0.6690  
-    ## Pennsylvania.l1  -1.341e+00  1.300e+00  -1.031   0.3497  
-    ## Rhode.Island.l1   2.025e+01  2.075e+01   0.976   0.3740  
-    ## Vermont.l1       -1.311e+00  2.004e+01  -0.065   0.9504  
-    ## Connecticut.l2    2.120e+00  6.125e+00   0.346   0.7434  
-    ## Maine.l2          7.272e-01  8.345e+00   0.087   0.9339  
-    ## Massachusetts.l2 -1.833e+00  3.433e+00  -0.534   0.6162  
-    ## New.Hampshire.l2  2.956e+00  1.273e+01   0.232   0.8256  
-    ## New.Jersey.l2    -1.816e-01  1.711e+00  -0.106   0.9196  
-    ## New.York.l2       7.713e-01  4.578e-01   1.685   0.1528  
-    ## Pennsylvania.l2   4.689e-01  1.181e+00   0.397   0.7077  
-    ## Rhode.Island.l2  -4.649e+00  1.032e+01  -0.451   0.6711  
-    ## Vermont.l2       -3.392e+01  2.307e+01  -1.470   0.2014  
-    ## const             4.421e+06  1.642e+06   2.693   0.0431 *
+    ## Connecticut.l1    5.337e-02  4.571e+00   0.012   0.9911  
+    ## Maine.l1         -3.442e+00  5.209e+00  -0.661   0.5379  
+    ## Massachusetts.l1 -3.697e-01  1.975e+00  -0.187   0.8589  
+    ## New.Hampshire.l1  1.261e+01  4.156e+00   3.034   0.0289 *
+    ## New.Jersey.l1     8.066e-01  6.791e-01   1.188   0.2883  
+    ## New.York.l1      -6.219e-01  1.276e+00  -0.487   0.6466  
+    ## Pennsylvania.l1   1.450e-01  7.141e-01   0.203   0.8471  
+    ## Rhode.Island.l1  -2.913e-02  1.059e+01  -0.003   0.9979  
+    ## Vermont.l1       -2.016e+01  9.759e+00  -2.065   0.0938 .
+    ## Connecticut.l2   -1.743e-01  3.850e+00  -0.045   0.9656  
+    ## Maine.l2          9.450e-01  4.422e+00   0.214   0.8392  
+    ## Massachusetts.l2  1.771e+00  2.395e+00   0.739   0.4930  
+    ## New.Hampshire.l2  3.605e+00  5.159e+00   0.699   0.5159  
+    ## New.Jersey.l2    -5.626e-01  9.702e-01  -0.580   0.5871  
+    ## New.York.l2      -3.129e-01  7.490e-01  -0.418   0.6935  
+    ## Pennsylvania.l2  -1.695e-01  6.174e-01  -0.274   0.7947  
+    ## Rhode.Island.l2  -7.503e+00  1.140e+01  -0.658   0.5397  
+    ## Vermont.l2        5.108e+00  1.612e+01   0.317   0.7641  
+    ## const             1.533e+04  6.570e+03   2.334   0.0669 .
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
-    ## Residual standard error: 493100 on 5 degrees of freedom
-    ## Multiple R-squared:  0.9988, Adjusted R-squared:  0.9943 
-    ## F-statistic: 225.7 on 18 and 5 DF,  p-value: 4.669e-06
+    ## Residual standard error: 13050 on 5 degrees of freedom
+    ## Multiple R-squared:  0.9776, Adjusted R-squared:  0.8972 
+    ## F-statistic: 12.15 on 18 and 5 DF,  p-value: 0.005835
 
 I should be able to run the following to get a summary for the entire
 VAR model, but in this dataset, I get an error that says the system in
@@ -218,30 +220,30 @@ summary(var_est)
 
 Next we run Phillips-Perron Unit Root Test, which tests the stationarity
 assumption. The results of the test suggest that the data is
-non-stationary, and there is a trend (this makes sense because of the
-upward covid cases trend).
+non-stationary, if we hold significance at the 0.05 level, and there is
+a trend (this makes sense because of the upward covid cases trend).
 
 ``` r
 pp_test <- lapply(ts_list, pp.test)
 
 lapply(pp_test, "[[", "p.value") %>%
   as.data.frame() %>%
-  pivot_longer(everything(), names_to = c("state")) %>%
-  mutate(value = round(value, 3))
+  pivot_longer(everything(), names_to = c("state"), values_to = "p.value") %>%
+  mutate(p.value = round(p.value, 3))
 ```
 
     ## # A tibble: 9 × 2
-    ##   state         value
-    ##   <chr>         <dbl>
-    ## 1 Connecticut   0.436
-    ## 2 Maine         0.9  
-    ## 3 Massachusetts 0.575
-    ## 4 New.Hampshire 0.769
-    ## 5 New.Jersey    0.451
-    ## 6 New.York      0.57 
-    ## 7 Pennsylvania  0.53 
-    ## 8 Rhode.Island  0.533
-    ## 9 Vermont       0.926
+    ##   state         p.value
+    ##   <chr>           <dbl>
+    ## 1 Connecticut     0.082
+    ## 2 Maine           0.068
+    ## 3 Massachusetts   0.074
+    ## 4 New.Hampshire   0.149
+    ## 5 New.Jersey      0.085
+    ## 6 New.York        0.094
+    ## 7 Pennsylvania    0.094
+    ## 8 Rhode.Island    0.048
+    ## 9 Vermont         0.048
 
 The stability function checks for structural breaks. Structural breaks
 may impact the estimation. The line in the middle of the plot should not
@@ -310,3 +312,25 @@ irf(var_est, impulse = "Connecticut", response = "Maine", n.ahead = 20, boot = T
 
 fevd(var_est)
 ```
+
+This is a plot of cumulative COVID cases over time.
+
+``` r
+northeast_df %>%
+  pivot_longer(cols = !date_ym, names_to = "state") %>%
+  group_by(state) %>%
+  mutate(cum_sum = cumsum(value)) %>%
+  ggplot() +
+  geom_line(aes(x = date_ym, y = cum_sum,  color = state)) +
+  scale_y_continuous(breaks = seq(0, 3000000, 500000),
+                     labels = seq(0, 3000000, 500000)/1000000, 
+                     limits = c(0, 3000000))+
+  labs(x= "", y = "Cases in Millions") + 
+  facet_wrap(~state) +
+  theme_minimal() +
+    theme(legend.position = "none", 
+        strip.text = element_text(size = 16, face = "bold"), 
+        axis.title = element_text(size = 16)) 
+```
+
+![](covid_us_states_files/figure-markdown_github/unnamed-chunk-13-1.png)
