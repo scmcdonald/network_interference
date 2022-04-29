@@ -3,10 +3,10 @@ title: "VAR for Covid Cases"
 author: "Sarah McDonald"
 date: "4/27/2022"
 output: 
-  #html_document
-  md_document:
-    variant: markdown_github
-always_allow_html: true
+  html_document
+  #md_document:
+   # variant: markdown_github
+#always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
@@ -24,6 +24,7 @@ library(zoo)
 library(vars)
 library(tseries)
 library(ggplot2)
+library(lubridate)
 ```
 
 
@@ -57,19 +58,13 @@ northeast_df <- df %>%
   # select northeast states only
   merge(northeast_states_df, by.x = "state", by.y = "state.abb", all.x = F) %>%
   select(submission_date, new_case, state.name) %>%
-  rename("state" = "state.name", "date" = "submission_date", "cases" = "new_case") %>%
-  mutate(month = substr(date, 1, 2), 
-         year = substr(date, 7, 10), 
-         date_ym = as.yearmon(paste(month, year, sep ="-"), format = "%m-%Y") ) %>%
-  select(state, cases, date_ym) %>%
-  group_by(date_ym, state) %>%
+  rename("state" = "state.name",  "cases" = "new_case") %>%
+  mutate(date = mdy(submission_date)) %>%
+  select(state, cases, date) %>%
+  group_by(date, state) %>%
   # calculate cases by month
   summarize(cases = sum(cases), .groups = "drop") %>%
   pivot_wider(names_from = state, values_from = cases) 
-
-# massachusets is only state to record in feb 2020, 
-# so start in March 2020
-northeast_df <- northeast_df[-c(1:2), ]
 ```
 
 Next we convert to a time series object.
@@ -77,10 +72,8 @@ Next we convert to a time series object.
 ```{r}
 # make each individual state a time series
 ts_list <- lapply(X = setNames(northeast_states, northeast_states), FUN =  function(x) {
-  state_ts <- ts(northeast_df[[x]],
-        start = c(2020, 3), 
-        end = c(2022, 4), 
-        frequency = 12)
+  state_ts <- ts(northeast_df[[x]], 
+        frequency = 1)
   state_ts
 })
 
@@ -108,50 +101,19 @@ VARselect(var_data)
 VAR does the estimation of VAR with OLS. 
 
 ```{r}
-var_est <- VAR(y = var_data, p = 2)
+var_est <- VAR(y = var_data, p = 10)
 
-# coefficients for each equation
-coefficients <- coef(var_est) %>%
-  lapply(as.data.frame) 
 
-# Connecticut example
-summary(var_est$varresult$Connecticut)
+# coefficients for each equation, CA example
+summary <- summary(var_est)
+summary$varresult$Pennsylvania
 ```
 
-I should be able to run the following to get a summary for the entire VAR model, but in this dataset, I get an error that says the system in singular:
 
-_Error in solve.default(Sigma) : system is computationally singular: reciprocal condition number = 1.44378e-19_
-
-It should give output like this:
-
-_VAR Estimation Results:_
-
-_=========================_
-
-_Endogenous variables: real_gdp_growth, psei, bsp_rrp, unem_
-
-_Deterministic variables: const_
-
-_Sample size: 78_
-
-_Log Likelihood: -876.81_ 
-
-_Roots of the characteristic polynomial:_
-
-_0.9776 0.8784  0.56 0.501 0.501 0.1641 0.1525 0.1525_
-
-_Call:_
-
-_VAR(y = v1, p = 2, type = "const", exogen = NULL)_
-
-```{r, eval = F}
-#can't run this due to singuilarity
-summary(var_est)
-```
 
 
 Next we run Phillips-Perron Unit Root Test, which tests the stationarity assumption.
-The results of the test suggest that the data is non-stationary, if we hold significance at the 0.05 level, and there is a trend (this makes sense because of the upward covid cases trend).
+The results of the test suggest that the data is stationary, if we hold significance at the 0.1 level.
 
 ```{r}
 pp_test <- lapply(ts_list, pp.test)
@@ -168,67 +130,56 @@ The stability function checks for structural breaks. Structural breaks may impac
 stability <- stability(var_est, type = "OLS-CUSUM")
 
 # connecticut for example
-stability$stability$Connecticut
-plot(stability$stability$Connecticut)
+stability$stability$Pennsylvania
+plot(stability$stability$Pennsylvania)
 ```
 
 
 
-There are additional functions we cannot run due to singularity.
+`serial.test()` computes the multivariate Portmanteau- and Breusch-Godfrey test for serially correlated errors. This checks the assumption that the residuals should be non-autocorrelated. The null hypothesis is that there is no serial correlation (need to check this). So we conclude, that there is serial correlation in this data.
 
-`serial.test()` computes the multivariate Portmanteau- and Breusch-Godfrey test for serially correlated errors. This checks the assumption that the residuals should be non-autocorrelated.
-
-`arch.test()` this computes the ARCH(autoregressive conditionally heteroscedastic)-LM test, which analyzes volatility variance.
-
-`causality()` computes Granger- and Instantaneous causality. Granger causality tests if one time series is useful for forecasting another. 
-
-```{r, eval = F}
+```{r}
 serial.test(var_est, type = "PT.asymptotic")
-
-arch.test(var_est, 
-          lags.multi = 15, 
-          multivariate.only = TRUE)
-
-causality(var_est, cause = "Connecticut")
 ```
 
 
-There are additional functions we cannot run due to not positive definite. This is the error:
+`arch.test()` this computes the ARCH(autoregressive conditionally heteroscedastic)-LM test, which analyzes volatility variance. Need to check what the null is for this test.
 
-_the leading minor of order 6 is not positive definite for normality test_
+```{r}
+arch.test(var_est, 
+          multivariate.only = TRUE)
+```
 
-`normality.test()` checks for normality of the distribution of the residuals.
+
+`causality()` computes Granger- and Instantaneous causality. Granger causality tests if one time series is useful for forecasting another. We would say that Pensylvaina does Granger-cause COVID cases in other states.
+
+```{r}
+causality(var_est, cause = "Pennsylvania")
+```
+
+
+
+`normality.test()` checks for normality of the distribution of the residuals. It's not clear what the null/alternative hypothesis is. I think it is that the null hypothesis is that the distribution is normal, so we would conclude that the residuals are not normal.
+```{r}
+normality.test(var_est, multivariate.only = TRUE)
+```
+
+
 
 `irf()` computes the impulse response coefficients. It is not clear to my why we would need this.
 
-`fevd()` computes the forecast error variance decomposition. It tells which states influence the variance the most over time.
-
 ```{r, eval = F}
-normality.test(var_est, multivariate.only = TRUE)
-
 irf(var_est, impulse = "Connecticut", response = "Maine", n.ahead = 20, boot = TRUE)
 
+```
+
+
+`fevd()` computes the forecast error variance decomposition. It tells which states influence the variance the most over time.
+
+```{r}
 fevd(var_est)
 ```
 
 
-This is a plot of cumulative COVID cases over time.
-```{r, fig.width = 10, fig.height= 7}
-northeast_df %>%
-  pivot_longer(cols = !date_ym, names_to = "state") %>%
-  group_by(state) %>%
-  mutate(cum_sum = cumsum(value)) %>%
-  ggplot() +
-  geom_line(aes(x = date_ym, y = cum_sum,  color = state)) +
-  scale_y_continuous(breaks = seq(0, 3000000, 500000),
-                     labels = seq(0, 3000000, 500000)/1000000, 
-                     limits = c(0, 3000000))+
-  labs(x= "", y = "Cases in Millions") + 
-  facet_wrap(~state) +
-  theme_minimal() +
-    theme(legend.position = "none", 
-        strip.text = element_text(size = 16, face = "bold"), 
-        axis.title = element_text(size = 16)) 
-```
 
 
