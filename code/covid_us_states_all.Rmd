@@ -1,0 +1,149 @@
+---
+title: "VAR for Covid Cases"
+author: "Sarah McDonald"
+date: "4/27/2022"
+output: 
+  html_document
+  #md_document:
+   # variant: markdown_github
+#always_allow_html: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE)
+```
+
+
+```{r}
+library(tidyverse)
+library(MASS, exclude = "select")
+library(here)
+library(zoo)
+library(vars)
+library(tseries)
+library(ggplot2)
+library(lubridate)
+```
+
+
+
+
+
+
+The data is from the [CDC](https://data.cdc.gov/Case-Surveillance/United-States-COVID-19-Cases-and-Deaths-by-State-o/9mfq-cb36/data).
+
+NYC is tabulated on its own. Also, the US territories are included.
+
+```{r}
+df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv")) %>%
+  select(submission_date, state, new_case) %>%
+  mutate(date = mdy(submission_date)) %>%
+  select(date, state, cases = new_case) %>%
+  pivot_wider(names_from = state, values_from = cases) 
+
+head(df) 
+```
+
+
+Next we convert to a time series object.
+
+```{r}
+# make each individual state a time series
+ts_list <- lapply(X = setNames(colnames(df)[-1],colnames(df)[-1]), FUN =  function(x) {
+  state_ts <- ts(df[[x]],
+        frequency = 1)
+  state_ts
+})
+
+# merge time series together into one time series object/matrix
+var_data <- do.call(ts.union, ts_list)
+```
+
+
+I use `VARselect` to see the information criteria for different lags. I choose 4.
+
+```{r}
+VARselect(var_data)
+```
+
+VAR does the estimation of VAR with OLS. 
+
+```{r}
+var_est <- VAR(y = var_data, p = 4)
+
+# coefficients for each equation, CA example
+summary <- summary(var_est)
+summary$varresult$CA
+```
+
+
+Next we run Phillips-Perron Unit Root Test, which tests the stationarity assumption.
+The results of the test suggest that the data is non-stationary, if we hold significance at the 0.05 level, and there is a trend (this makes sense because of the upward covid cases trend). We would conclude stationarity for most states.
+
+```{r}
+pp_test <- lapply(ts_list, pp.test)
+
+lapply(pp_test, "[[", "p.value") %>%
+  as.data.frame() %>%
+  pivot_longer(everything(), names_to = c("state"), values_to = "p.value") %>%
+  mutate(p.value = round(p.value, 3))
+```
+
+The stability function checks for structural breaks. Structural breaks may impact the estimation. The line in the middle of the plot should not go outside of the red bounds.
+
+```{r}
+stability <- stability(var_est, type = "OLS-CUSUM")
+
+# California for example
+stability$stability$CA
+plot(stability$stability$CA)
+```
+
+`serial.test()` computes the multivariate Breusch-Godfrey test for serially correlated errors. This checks the assumption that the residuals should be non-autocorrelated. The null hypothesis is that there is no serial correlation. So we conclude, that there is serial correlation in this data.
+
+```{r}
+serial.test(var_est, type = "BG")
+```
+
+
+We cannot run this function due to singularity: `arch.test()` this computes the ARCH(autoregressive conditionally heteroscedastic)-LM test, which analyzes volatility variance.
+
+```{r, eval = F}
+arch.test(var_est)
+```
+
+
+This takes too much time: `causality()` computes Granger- and Instantaneous causality. Granger causality tests if one time series is useful for forecasting another. 
+
+```{r, eval = F}
+causality(var_est, cause = "CA")
+```
+
+
+`normality.test()` checks for normality of the distribution of the residuals. It's not clear what the null/alternative hypothesis is. I think it is that the null hypothesis is that the distribution is normal, so we would conclude that the residuals are not normal.
+
+```{r}
+normality.test(var_est, multivariate.only = TRUE)
+```
+
+
+
+`fevd()` computes the forecast error variance decomposition. It tells which states influence the variance the most over time.
+
+```{r}
+fevd_out <- fevd(var_est)
+fevd_out$CA
+```
+
+
+`irf()` computes the impulse response coefficients. This takes a while to run.
+
+```{r, eval = F}
+irf(var_est, impulse = "CA", response = "WA", n.ahead = 10, boot = TRUE)
+```
+
+
+
+
