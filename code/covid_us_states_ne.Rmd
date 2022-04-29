@@ -3,10 +3,10 @@ title: "VAR for Covid Cases"
 author: "Sarah McDonald"
 date: "4/27/2022"
 output: 
-  html_document
-  #md_document:
-   # variant: markdown_github
-#always_allow_html: true
+  #html_document
+  md_document:
+    variant: markdown_github
+always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE,
                       warning = FALSE, 
                       message = FALSE)
 ```
+
+
 
 
 ```{r}
@@ -32,7 +34,7 @@ library(lubridate)
 
 
 
-The data is from the [CDC](https://data.cdc.gov/Case-Surveillance/United-States-COVID-19-Cases-and-Deaths-by-State-o/9mfq-cb36/data).
+The data is from the [CDC](https://data.cdc.gov/Case-Surveillance/United-States-COVID-19-Cases-and-Deaths-by-State-o/9mfq-cb36/data). Note: New York City is tabulated separately from New York State.
 
 ```{r}
 df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv")) %>%
@@ -45,20 +47,22 @@ For simplicity, start with a subset of northeastern states, with counts by month
 
 ```{r}
 # make table of states/regions
-states <- data.frame(state.name, state.region, state.abb)
+states <- data.frame(state.name, state.abb)
 northeast_states_df <- states %>%
   filter(state.region == "Northeast")
 northeast_states <- northeast_states_df %>%
-  select(state.name) %>%
-  rename("state" = "state.name") %>%
+  select(state.abb) %>%
+  rename("state" = "state.abb") %>%
   pull(state)
+
+northeast_states <- c(northeast_states, "NYC")
 
 # make northeast df
 northeast_df <- df %>%
   # select northeast states only
-  merge(northeast_states_df, by.x = "state", by.y = "state.abb", all.x = F) %>%
-  select(submission_date, new_case, state.name) %>%
-  rename("state" = "state.name",  "cases" = "new_case") %>%
+  filter(state %in% northeast_states) %>%
+  select(submission_date, new_case, state) %>%
+  rename( "cases" = "new_case") %>%
   mutate(date = mdy(submission_date)) %>%
   select(state, cases, date) %>%
   group_by(date, state) %>%
@@ -87,12 +91,9 @@ So, I calculate the correlation matrix and take the determinant, and find that i
 ```{r}
 cor_matrix <- round(cor(var_data), 3)
 cor_matrix
-# I think this is the problem -> 0 with machine precision
-print(paste("The determinant is:", det(cor_matrix)))
-
 ```
 
-I use `VARselect` to see the information criteria for different lags. All agree that the lag should be 2.
+I use `VARselect` to see the information criteria for different lags. I choose 10.
 
 ```{r}
 VARselect(var_data)
@@ -106,7 +107,7 @@ var_est <- VAR(y = var_data, p = 10)
 
 # coefficients for each equation, CA example
 summary <- summary(var_est)
-summary$varresult$Pennsylvania
+summary$varresult$PA
 ```
 
 
@@ -130,8 +131,8 @@ The stability function checks for structural breaks. Structural breaks may impac
 stability <- stability(var_est, type = "OLS-CUSUM")
 
 # connecticut for example
-stability$stability$Pennsylvania
-plot(stability$stability$Pennsylvania)
+stability$stability$PA
+plot(stability$stability$PA)
 ```
 
 
@@ -154,7 +155,7 @@ arch.test(var_est,
 `causality()` computes Granger- and Instantaneous causality. Granger causality tests if one time series is useful for forecasting another. We would say that Pensylvaina does Granger-cause COVID cases in other states.
 
 ```{r}
-causality(var_est, cause = "Pennsylvania")
+causality(var_est, cause = "PA")
 ```
 
 
@@ -169,7 +170,7 @@ normality.test(var_est, multivariate.only = TRUE)
 `irf()` computes the impulse response coefficients. It is not clear to my why we would need this.
 
 ```{r, eval = F}
-irf(var_est, impulse = "Connecticut", response = "Maine", n.ahead = 20, boot = TRUE)
+irf(var_est, impulse = "PA", response = "MA", n.ahead = 20, boot = TRUE)
 
 ```
 
@@ -177,7 +178,8 @@ irf(var_est, impulse = "Connecticut", response = "Maine", n.ahead = 20, boot = T
 `fevd()` computes the forecast error variance decomposition. It tells which states influence the variance the most over time.
 
 ```{r}
-fevd(var_est)
+fevd_out <- fevd(var_est)
+fevd_out$PA
 ```
 
 
