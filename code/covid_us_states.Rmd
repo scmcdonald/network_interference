@@ -2,7 +2,11 @@
 title: "VAR for Covid Cases"
 author: "Sarah McDonald"
 date: "4/27/2022"
-output: html_document
+output: 
+  html_document
+  #md_document:
+    #variant: markdown_github
+#always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
@@ -21,30 +25,32 @@ library(vars)
 library(tseries)
 ```
 
+The data is from the New York Times Covid 19 dataset [available on Github](https://github.com/nytimes/covid-19-data).
 
 ```{r}
 df <- read.csv(here("data/us-states.csv"))
+head(df) 
 ```
 
-For simplicity, start with a subset of northeastern states
+For simplicity, start with a subset of northeastern states, with counts by month starting in March 2020. We will look at Covid cases instead of deaths.
 
 ```{r}
+# make table of states/regions
 states <- data.frame(state.name, state.region)
-northeast_states <- states%>%
+northeast_states <- states %>%
   filter(state.region == "Northeast") %>%
            pull(state.name)
-```
+northeast_states
 
-
-For simplicity, let's look at covid case counts by month
-Our months will start in March 2020
-```{r}
+# make northeast df
 northeast_df <- df %>%
+  # select northeast states only
   filter(state %in% northeast_states) %>%
   mutate(date_ym = as.yearmon(substr(date,1, 7), 
                               format = "%Y-%m")) %>%
   select(state, cases, date_ym) %>%
   group_by(date_ym, state) %>%
+  # calculate cases by month
   summarize(cases = sum(cases), .groups = "drop") %>%
   pivot_wider(names_from = state, values_from = cases) %>%
   # massachusets is only state to record in feb 2020, 
@@ -52,75 +58,146 @@ northeast_df <- df %>%
   drop_na()
 ```
 
-Make time series
+Next we convert to a time series object.
 
 ```{r}
-for(i in northeast_states){
-  
-  state_ts <- ts(northeast_df[[i]],
-          start = c(2020, 3), 
-          end = c(2022, 4), 
-          frequency = 12)
-  
-  assign(paste(str_replace(tolower(i), " ", ""), "ts", sep= "_"), state_ts)
-  
-}
+# make each individual state a time series
+ts_list <- lapply(X = setNames(northeast_states, northeast_states), FUN =  function(x) {
+  state_ts <- ts(northeast_df[[x]],
+        start = c(2020, 3), 
+        end = c(2022, 4), 
+        frequency = 12)
+  state_ts
+})
 
-var_data <- do.call(ts.union, mget(paste(str_replace(tolower(northeast_states), " ", ""), "ts", sep= "_")))
-
+# merge time series together into one time series object/matrix
+var_data <- do.call(ts.union, ts_list)
 ```
 
-
+Next we calculate a correlation between states. I get errors later about singularity and positive definite. 
+So, I calculate the correlation matrix and take the determinant, and find that it is treated as zero by machine precision.
 
 ```{r}
-cor_matrix <- cor(var_data)
+cor_matrix <- round(cor(var_data), 3)
+cor_matrix
 # I think this is the problem -> 0 with machine precision
-det(cor_matrix)
+print(paste("The determinant is:", det(cor_matrix)))
+
 ```
 
+I use `VARselect` to see the information criteria for different lags. All agree that the lag should be 2.
 
 ```{r}
 VARselect(var_data)
+```
+
+VAR does the estimation of VAR with OLS. 
+
+```{r}
 var_est <- VAR(y = var_data, p = 2)
-var_est
-coef(var_est) %>%
-  lapply(as.data.frame)
+
+# coefficients for each equation
+coefficients <- coef(var_est) %>%
+  lapply(as.data.frame) 
+
+# Connecticut example
+summary(var_est$varresult$Connecticut)
+```
+
+I should be able to run the following to get a summary for the entire VAR model, but in this dataset, I get an error that says the system in singular:
+
+_Error in solve.default(Sigma) : system is computationally singular: reciprocal condition number = 1.44378e-19_
+
+It should give output like this:
+
+_VAR Estimation Results:_
+
+_=========================_
+
+_Endogenous variables: real_gdp_growth, psei, bsp_rrp, unem_
+
+_Deterministic variables: const_
+
+_Sample size: 78_
+
+_Log Likelihood: -876.81_ 
+
+_Roots of the characteristic polynomial:_
+
+_0.9776 0.8784  0.56 0.501 0.501 0.1641 0.1525 0.1525_
+
+_Call:_
+
+_VAR(y = v1, p = 2, type = "const", exogen = NULL)_
+
+```{r, eval = F}
 #can't run this due to singuilarity
-#summary(var_est)
+summary(var_est)
 ```
 
 
-Is our data stationary? no. This means there isa trend (this makes sense because of the upward covid cases trend)
+Next we run Phillips-Perron Unit Root Test, which tests the stationarity assumption.
+The results of the test suggest that the data is non-stationary, and there is a trend (this makes sense because of the upward covid cases trend).
+
 ```{r}
-pp_test <- lapply(mget(paste(str_replace(tolower(northeast_states), " ", ""), "ts", sep= "_")), pp.test)
+pp_test <- lapply(ts_list, pp.test)
 
 lapply(pp_test, "[[", "p.value") %>%
   as.data.frame() %>%
   pivot_longer(everything(), names_to = c("state")) %>%
   mutate(value = round(value, 3))
-
-# can't run thi due to singualr system
-# serial <- serial.test(var_est, type = "PT.asymptotic")
-# arch.test(var_est, lags.multi = 15, multivariate.only = TRUE)
-# the leading minor of order 6 is not positive definite for normality test
-# Norm1 <- normality.test(var_est, multivariate.only = TRUE)
-#irf_mass <- irf(var_est, impulse = "massachusetts_ts", response = "massachusetts_ts", n.ahead = 20, boot = TRUE)
-# can't run this due to singularity
-#causality(var_est, cause = "newyork_ts")
-
 ```
 
-testing for structural breaks
+The stability function checks for structural breaks. Structural breaks may impact the estimation. The line in the middle of the plot should not go outside of the red bounds.
 
 ```{r}
-Stability1 <- stability(var_est, type = "OLS-CUSUM")
-#plot(Stability1)
-Stability1$stability$connecticut_ts
+stability <- stability(var_est, type = "OLS-CUSUM")
+
+# connecticut for example
+stability$stability$Connecticut
+plot(stability$stability$Connecticut)
 ```
 
 
-```{r}
+
+There are additional functions we cannot run due to singularity.
+
+`serial.test()` computes the multivariate Portmanteau- and Breusch-Godfrey test for serially correlated errors. This checks the assumption that the residuals should be non-autocorrelated.
+
+`arch.test()` this computes the ARCH(autoregressive conditionally heteroscedastic)-LM test, which analyzes volatility variance.
+
+`causality()` computes Granger- and Instantaneous causality. Granger causality tests if one time series is useful for forecasting another. 
+
+```{r, eval = F}
+serial.test(var_est, type = "PT.asymptotic")
+
+arch.test(var_est, 
+          lags.multi = 15, 
+          multivariate.only = TRUE)
+
+causality(var_est, cause = "Connecticut")
+```
+
+
+There are additional functions we cannot run due to not positive definite. This is the error:
+
+_the leading minor of order 6 is not positive definite for normality test_
+
+`normality.test()` checks for normality of the distribution of the residuals.
+
+`irf()` computes the impulse response coefficients. It is not clear to my why we would need this.
+
+`fevd()` computes the forecast error variance decomposition. It tells which states influence the variance the most over time.
+
+```{r, eval = F}
+normality.test(var_est, multivariate.only = TRUE)
+
+irf(var_est, impulse = "Connecticut", response = "Maine", n.ahead = 20, boot = TRUE)
+
 fevd(var_est)
 ```
+
+
+
 
 
