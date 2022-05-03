@@ -144,6 +144,77 @@ fevd_out$CA
 irf(var_est, impulse = "CA", response = "WA", n.ahead = 10, boot = TRUE)
 ```
 
+ Function
+ 
+```{r}
+# one year of data
 
+data = df
+prediction_date = "2021-10-07"
+lag = 4
+period = 7
+
+prediction_performance <- function(data, prediction_date, lag, period){
+
+  prediction_date = as.Date(prediction_date)
+  actual_start = "2020-09-30"
+  actual_end = prediction_date - period
+  
+  actual_data_train <- data %>%
+    filter(date >= actual_start & date <= actual_end)
+  
+  # make each individual state a time series
+  ts_list <- lapply(X = setNames( colnames(data) [!(colnames(data) %in% "date")],  colnames(data) [!(colnames(data) %in% "date")]), FUN =  function(x) {
+    state_ts <- ts(actual_data_train[[x]], 
+          frequency = 1)
+    state_ts
+  })
+  
+  var_data <- do.call(ts.union, ts_list)
+  
+  model <- VAR(var_data, p = lag)
+  
+  prediction <- predict(model, n.ahead = period)
+  
+  predicted_t_7 <-lapply(prediction$fcst, "[[", 7)  %>%
+    as.data.frame() %>%
+    pivot_longer(everything(), names_to = c("state"), values_to = "predicted_t_7")
+  
+  actual_t_7 <- data %>%
+    filter(date == prediction_date) %>%
+    select(!date) %>%
+    pivot_longer(everything(), names_to = "state", values_to = "actual_t_7")
+  
+  
+  comparison <- merge(predicted_t_7, actual_t_7, by = "state", all = T) %>%
+    mutate(diff = actual_t_7- predicted_t_7, 
+           diff_squared = diff^2)
+  
+  rmse = sqrt(mean(comparison$diff_squared))
+  
+  
+  final <- list(prediction_date = prediction_date, 
+                actual_start = actual_start, 
+                actual_end = actual_end, 
+                lag = lag, 
+                period = period, 
+                rmse = rmse)
+  
+  return(final)
+}
+
+
+
+
+
+
+out <- lapply(X = seq(as.Date("2021-10-01"), as.Date("2021-10-10"), 1), 
+               FUN = function(x) prediction_performance(data = df, 
+                                                        prediction_date = x, 
+                                                        lag = 4, 
+                                                        period = 7))
+do.call(rbind, out)
+```
+ 
 
 
