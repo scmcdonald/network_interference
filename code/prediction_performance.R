@@ -46,8 +46,10 @@ rmse <- function(data, prediction_date, lag, period){
   # put together predicted and actual values
   # calculate difference and squared difference
   comparison <- merge(predicted_t_7, actual_t_7, by = "state", all = T) %>%
+    #mutate(predicted_t_7 = exp(predicted_t_7)-1, 
+          # actual_t_7 = exp(actual_t_7)-1) %>%
     mutate(diff = actual_t_7- predicted_t_7, 
-           diff_squared = diff^2)
+           diff_squared = diff^2) 
   
   # calcualte RMSE
   rmse = sqrt(mean(comparison$diff_squared))
@@ -78,24 +80,34 @@ prediction_performance <- function(data, prediction_dates, lag, period){
 
 df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv")) %>%
   select(submission_date, state, new_case) %>%
+  mutate(new_case = ifelse(new_case <0, 0, new_case)) %>%
+  mutate(new_case = log(new_case + 1))%>%
   mutate(date = mdy(submission_date)) %>%
   select(date, state, cases = new_case) %>%
   pivot_wider(names_from = state, values_from = cases) 
 
 
+start_time <- Sys.time()
 
 rmse_out <- prediction_performance(data = df, 
                                    prediction_dates = seq(as.Date("2021-10-07"), 
                                                           as.Date("2021-11-06"), 1), 
                                    lag = 4, 
                                    period = 7)
+end_time <- Sys.time()
+
+total_time <- end_time - start_time
+
+
+write.table(total_time, here("code/runtime.txt"), append = FALSE, sep = ",", dec = ".",
+            row.names = F, col.names = F)
+
 #==================#
 
 ggplot(rmse_out, aes(x = as.numeric(prediction_date), y = rmse)) + 
   geom_bar(stat = "identity") +
   scale_x_reverse(labels = as.character(format(rmse_out$prediction_date, format = "%b %d")),                     
                   breaks = as.numeric(rmse_out$prediction_date)) + 
-  #scale_x_date(breaks = "1 day", date_labels = "%b %d") + 
   theme_minimal() +
   coord_flip()  +
   labs(x = "Date (2021)", 
