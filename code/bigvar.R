@@ -24,35 +24,35 @@ raw_df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_o
 df <- raw_df %>%
   pivot_wider(names_from = state, values_from = cases) 
 
- #  write csv with the actual values for 10-07-2022 through 11-06-2022
- # actual_benchmark <- df %>%
- #   filter(date %in% prediction_dates) %>%
- #   pivot_longer(!date, names_to = "state", values_to = "actual")
- # 
- # write.csv(actual_benchmark, "data/actual_benchmark.csv", row.names = F)
+ # write csv with the actual values for 10-07-2022 through 11-06-2022
+ actual_benchmark <- df %>%
+   filter(date %in% prediction_dates) %>%
+   pivot_longer(!date, names_to = "state", values_to = "actual")
 
-# write csv with average predictions for 10-07-2022 through 11-06-2022
-# data = df
-# week_means <- data.frame()
-# for(j in prediction_dates){
-#   
-#   j = as.Date(j)
-#   
-#   week_start = j- 13
-#   week_end = j - 7
-#   one_week <- seq(week_start, week_end, 1)
-#   
-#   means <- data %>%
-#     filter(date %in% one_week) %>%
-#     summarize(across(!date, mean )) %>%
-#     pivot_longer(everything(), names_to = "state", values_to = "pred_week_means") %>%
-#     arrange(state) %>%
-#     mutate(date = j, week_start = week_start, week_end = week_end)
-#   
-#   week_means <- rbind(week_means, means)
-# }
-# 
-# write.csv(week_means, "data/week_mean_predictions.csv", row.names = F)
+ write.csv(actual_benchmark, "data/actual_benchmark.csv", row.names = F)
+
+#write csv with average predictions for 10-07-2022 through 11-06-2022
+data = df
+week_means <- data.frame()
+for(j in prediction_dates){
+
+  j = as.Date(j)
+
+  week_start = j- 13
+  week_end = j - 7
+  one_week <- seq(week_start, week_end, 1)
+
+  means <- data %>%
+    filter(date %in% one_week) %>%
+    summarize(across(!date, mean )) %>%
+    pivot_longer(everything(), names_to = "state", values_to = "pred_week_means") %>%
+    arrange(state) %>%
+    mutate(date = j, week_start = week_start, week_end = week_end)
+
+  week_means <- rbind(week_means, means)
+}
+
+write.csv(week_means, "data/week_mean_predictions.csv", row.names = F)
 
 actual_benchmark <- read.csv(here("data/actual_benchmark.csv"))
 week_means <- read.csv(here("data/week_mean_predictions.csv"))
