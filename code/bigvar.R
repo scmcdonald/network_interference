@@ -1,11 +1,18 @@
 rm(list=ls())
 
+
 library(here)
 library(tidyverse)
 library(lubridate)
 library(MASS, exclude = "select")
 library(vars)
-library(BigVAR)
+library(BigVAR, exclude = "filter")
+library(RColorBrewer)
+
+cb_colors <- brewer.pal(n = 8, name = "Dark2")
+
+# prediction_dates <- seq(as.Date("2021-10-07"), 
+#                         as.Date("2021-11-30"), 1)
 
 raw_df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv")) %>%
   select(submission_date, state, new_case)%>%
@@ -17,43 +24,43 @@ raw_df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_o
 df <- raw_df %>%
   pivot_wider(names_from = state, values_from = cases) 
 
-# write csv with the actual values for 10-07-2022 trhough 11-06-2022
-#actual_benchmark <- df %>%
-#  filter(date %in% prediction_dates) %>%
-#  pivot_longer(!date, names_to = "state", values_to = "actual")
+ #  write csv with the actual values for 10-07-2022 through 11-06-2022
+ # actual_benchmark <- df %>%
+ #   filter(date %in% prediction_dates) %>%
+ #   pivot_longer(!date, names_to = "state", values_to = "actual")
+ # 
+ # write.csv(actual_benchmark, "data/actual_benchmark.csv", row.names = F)
 
-#write.csv(actual_benchmark, "data/actual_benchmark.csv", row.names = F)
-
-# write csv with average predictions for 10-07-2022 trhough 11-06-2022
-
-#week_means <- data.frame()
-#for(j in prediction_dates){
-  
-#  j = as.Date(j)
-  
-#  week_start = j- 13
-#  week_end = j - 7
-#  one_week <- seq(week_start, week_end, 1)
-  
-#  means <- data %>%
-#    filter(date %in% one_week) %>%
-#    summarize(across(!date, mean )) %>%
-#    pivot_longer(everything(), names_to = "state", values_to = "pred_week_means") %>%
-#    arrange(state) %>%
-#    mutate(date = j, week_start = week_start, week_end = week_end)
-  
-#  week_means <- rbind(week_means, means)
-#}
-
-#write.csv(week_means, "data/week_mean_predictions.csv", row.names = F)
+# write csv with average predictions for 10-07-2022 through 11-06-2022
+# data = df
+# week_means <- data.frame()
+# for(j in prediction_dates){
+#   
+#   j = as.Date(j)
+#   
+#   week_start = j- 13
+#   week_end = j - 7
+#   one_week <- seq(week_start, week_end, 1)
+#   
+#   means <- data %>%
+#     filter(date %in% one_week) %>%
+#     summarize(across(!date, mean )) %>%
+#     pivot_longer(everything(), names_to = "state", values_to = "pred_week_means") %>%
+#     arrange(state) %>%
+#     mutate(date = j, week_start = week_start, week_end = week_end)
+#   
+#   week_means <- rbind(week_means, means)
+# }
+# 
+# write.csv(week_means, "data/week_mean_predictions.csv", row.names = F)
 
 actual_benchmark <- read.csv(here("data/actual_benchmark.csv"))
 week_means <- read.csv(here("data/week_mean_predictions.csv"))
 
 ### BIGVAR
-prediction_dates <- seq(as.Date("2021-10-07"), 
-                        as.Date("2021-11-06"), 1)
 
+prediction_dates <- seq(as.Date("2021-11-19"), 
+                         as.Date("2021-11-30"), 1)
 states <- sort(colnames(df)[colnames(df) != "date"])
 final <- data.frame()
 data = df
@@ -157,23 +164,111 @@ for(j in prediction_dates){
   assign(paste("comparison",j, sep = "_"), comparison, envir = .GlobalEnv)
 }
   
-
-
-
-
-#write.csv(final, "data/rmse_out/out_10_07_2021_10_17_2021.csv")
-#comparison_list <- mget(ls(pattern="comparison_2021-"), ifnotfound = "Not Found")
-#lapply(1:length(comparison_list), function(x) write.csv(comparison_list[[x]], 
-    #                                                    paste("data/rmse_out/comparison", unique(comparison_list[[x]]$date), ".csv", sep = ""), 
-     #                                                   row.names = F))
-
 final$best_method <- str_remove(colnames(final[, c("rmse_pred_Basic", "rmse_pred_HLAGC", 
-                   "rmse_pred_HLAGOO", "rmse_pred_HLAGELEM", 
-                   "rmse_pred_week_means")])[apply(final[, c("rmse_pred_Basic", "rmse_pred_HLAGC", 
-                                                             "rmse_pred_HLAGOO", "rmse_pred_HLAGELEM", 
-                                                             "rmse_pred_week_means")],1,which.min)], 
-           "rmse_pred_")
+                                                   "rmse_pred_HLAGOO", "rmse_pred_HLAGELEM", 
+                                                   "rmse_pred_week_means")])[apply(final[, c("rmse_pred_Basic", "rmse_pred_HLAGC", 
+                                                                                             "rmse_pred_HLAGOO", "rmse_pred_HLAGELEM", 
+                                                                                             "rmse_pred_week_means")],1,which.min)], 
+                                "rmse_pred_")
 
 
-#write.csv(final, "data/rmse_out/out_10_07_2021_10_17_2021.csv")
+# write.csv(final, "data/rmse_out/out_11_19_2021_11_30_2021.csv")
+
+
+
+# comparison_list <- mget(ls(pattern="comparison_2021-"), ifnotfound = "Not Found")
+# lapply(1:length(comparison_list), function(x) write.csv(comparison_list[[x]],
+#                                                         paste("data/rmse_out/comparison", unique(comparison_list[[x]]$date), ".csv", sep = ""),
+#                                                         row.names = F))
+
+
+
+
+
+compare_1 <- read.csv(here("data", "rmse_out", "out_10_07_2021_10_17_2021.csv"))
+compare_2 <- read.csv(here("data", "rmse_out", "out_10_18_2021_11_06_2021.csv"))
+compare_3 <- read.csv(here("data", "rmse_out", "out_11_07_2021_11_18_2021.csv"))
+compare_4 <- read.csv(here("data", "rmse_out", "out_11_19_2021_11_30_2021.csv"))
+
+comparison <- list(compare_1, compare_2, compare_3, compare_4) %>%
+  do.call(rbind, .) %>%
+arrange(prediction_date)
+
+
+comparison$prediction_date <- as.Date(comparison$week_end) + 7
+
+
+text_color <- comparison %>%
+  select(prediction_date, rmse_pred_Basic, rmse_pred_HLAGC, rmse_pred_HLAGELEM, rmse_pred_HLAGOO, rmse_pred_week_means) %>%
+  pivot_longer(!prediction_date, names_to = "rmse_name", values_to = "rmse_value") %>%
+  group_by(prediction_date) %>%
+  mutate(rmse_min= ifelse(rmse_value == min(rmse_value), 1, 0), 
+         best_rmse =rmse_name[which.max(rmse_min)]) %>%
+  ungroup() %>%
+  select(prediction_date, best_rmse) %>%
+  mutate(color = case_when(best_rmse == "rmse_pred_week_means" ~ "black",
+                           best_rmse == "rmse_pred_Basic" ~ cb_colors[1],
+                           best_rmse == "rmse_pred_HLAGC" ~ cb_colors[2],
+                           best_rmse == "rmse_pred_HLAGELEM" ~ cb_colors[3],
+                           best_rmse == "rmse_pred_HLAGOO" ~ cb_colors[4],
+                           TRUE ~ "red")) %>%
+  distinct()
+
+
+comparison %>%
+  select(prediction_date, rmse_pred_Basic, rmse_pred_HLAGC, rmse_pred_HLAGELEM, rmse_pred_HLAGOO, rmse_pred_week_means) %>%
+  pivot_longer(!prediction_date, names_to = "rmse_name", values_to = "rmse_value") %>%
+  group_by(prediction_date) %>%
+  mutate(rmse_min= ifelse(rmse_value == min(rmse_value), 1, 0), 
+         best_rmse =rmse_name[which.max(rmse_min)]) %>%
+  ggplot(aes(x = as.numeric(prediction_date), y = rmse_value, color = rmse_name)) +
+  geom_point(size = 3) + 
+  scale_color_manual(name = "RMSE", values = c(cb_colors[1:4], "black"), 
+                     labels = c("Basic", "HLAGC", "HALGELEM", "HLAGOO", "Week Means")) +
+  scale_x_reverse(labels = as.character(format(comparison$prediction_date, format = "%b %d")),                     
+                  breaks = as.numeric(comparison$prediction_date)) + 
+  scale_y_continuous(limits = c(0,5))+ 
+  theme_minimal() +
+  coord_flip()  +
+  labs(x = "Date (2021)", 
+       y = "RMSE", 
+       title = "RMSE by Prediction Date") +
+  theme(axis.text.y = element_text(color =text_color$color, face = "bold"))
+
+                                                                                                   
+
+
+prop.table(table(comparison$best_method))
+
+original_df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_over_Time.csv")) %>%
+  select(submission_date, state, new_case)%>%
+  mutate(new_case = ifelse(new_case <0, 0, new_case)) %>%
+  select(date = submission_date, cases = new_case)
+
+original_df %>%
+  group_by(date) %>%
+  summarize(cases = sum(cases)) %>%
+  mutate(date = mdy(date), 
+         predicted_dates = date %in% seq(as.Date("2021-10-07"), as.Date("2021-11-30"), 1)) %>%
+  ggplot(aes(x = date, y = cases, fill = predicted_dates))+
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  scale_fill_manual(values =c("black", cb_colors[1]), guide = "none")+
+  #geom_vline(xintercept = mdy("10/07/2021"), color = "red")+
+  #geom_vline(xintercept = mdy("11/30/2021"), color = "red") + 
+  scale_y_continuous(label = scales::comma,
+                     breaks = seq(0, 1250000, by = 250000),
+                     limits = c(0, 1300000)) +
+  labs(title = "Number of New COVID 19 Cases per Day", 
+       subtitle = paste("<span style='color:", cb_colors[1], ";'>Green</span> bars indicate our prediction dates"), 
+       y = "", 
+       x = "") +
+  theme(plot.subtitle = element_markdown(size = 16), 
+        plot.title = element_text(size = 16, face = "bold"), 
+        plot.title.position = "plot",
+        axis.text = element_text(size = 16))
+
+
+
+
 
