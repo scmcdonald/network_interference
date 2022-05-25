@@ -24,12 +24,12 @@ week_means <- read.csv(here("data/week_mean_predictions.csv"))
 
 ### BIGVAR
 
-prediction_dates <- seq(as.Date("2021-10-07"), 
-                        as.Date("2021-11-30"), 1)
+prediction_dates <- seq(as.Date("2021-11-01"), 
+                        as.Date("2021-11-15"), 1)
 states <- sort(colnames(df)[colnames(df) != "date"])
 final <- data.frame()
 data = df
-lag = Sys.getenv('LAG')
+lag = 10
 h = 7
 recursive = T
 methods <- c("Basic", "HLAGC", "HLAGOO", "HLAGELEM")
@@ -141,5 +141,16 @@ comparison_list <- mget(ls(pattern="comparison_2021-"), ifnotfound = "Not Found"
 lapply(1:length(comparison_list), function(x) write.csv(comparison_list[[x]],
                                                          paste("data/rmse_out/comparison", unique(comparison_list[[x]]$date), "_", lag, ".csv", sep = ""),
                                                          row.names = F))
+
+
+
+
+
+
+
+
+
+
+
 
 
