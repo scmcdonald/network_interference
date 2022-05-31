@@ -19,17 +19,18 @@ raw_df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_o
 df <- raw_df %>%
   pivot_wider(names_from = state, values_from = cases) 
 
-actual_benchmark <- read.csv(here("data/actual_benchmark.csv"))
-week_means <- read.csv(here("data/week_mean_predictions.csv"))
+actual_benchmark <- read.csv(here("data/actual_benchmark.csv"), colClasses = c("Date", "character", "numeric"))
+week_means <- read.csv(here("data/week_mean_predictions.csv"), , colClasses = c("character", "numeric", "Date", "Date", "Date"))
 
 ### BIGVAR
 
-prediction_dates <- seq(as.Date("2021-10-07"), 
-                        as.Date("2021-11-30"), 1)
+prediction_dates <- seq(as.Date(Sys.getenv('START_DATE'), format = "%Y-%m-%d"), 
+                        as.Date(Sys.getenv('END_DATE'), format = "%Y-%m-%d"), 1)
 states <- sort(colnames(df)[colnames(df) != "date"])
 final <- data.frame()
+					      			
 data = df
-lag = Sys.getenv('LAG')
+lag = as.numeric(Sys.getenv('LAG'))
 h = 7
 recursive = T
 methods <- c("Basic", "HLAGC", "HLAGOO", "HLAGELEM")
@@ -78,15 +79,14 @@ for(j in prediction_dates){
     
     print(paste(j, i, "complete"))
   }
-  
+  print("bigvar done")
+
   actual_df <- actual_benchmark %>%
     filter(date == j) %>%
-    mutate(date =as.Date(date)) %>%
     arrange(state)
   
   week_means_pred <- week_means %>%
     filter(date == j) %>%
-    mutate(date =as.Date(date)) %>%
     arrange(state) 
   
   comparison <- list(actual_df, predictions, week_means_pred) %>%
@@ -96,7 +96,8 @@ for(j in prediction_dates){
            diff_pred_HLAGOO = (actual - pred_HLAGOO)^2, 
            diff_pred_HLAGELEM = (actual - pred_HLAGELEM)^2, 
            diff_pred_week_means = (actual - pred_week_means)^2) 
-  
+  print("comparison df done")
+
   # calculate RMSE
   rmse_pred_Basic = sqrt(mean(comparison$diff_pred_Basic))
   rmse_pred_HLAGC = sqrt(mean(comparison$diff_pred_HLAGC))
@@ -117,9 +118,11 @@ for(j in prediction_dates){
               rmse_pred_HLAGOO = rmse_pred_HLAGOO,
               rmse_pred_HLAGELEM = rmse_pred_HLAGELEM,
               rmse_pred_week_means = rmse_pred_week_means)
-  
+  print("outlist done")
   
   final <- rbind(final, out)
+
+  print("rbind to final df done")
   assign(paste("comparison",j, sep = "_"), comparison, envir = .GlobalEnv)
 }
 
@@ -133,13 +136,13 @@ final$best_method <- str_remove(colnames(final[, c("rmse_pred_Basic", "rmse_pred
 
 
 
-write.csv(final, paste("data/rmse_out/out_", min(prediction_dates),"_", max(prediction_dates), "_", lag,".csv", sep = ""))
+write.csv(final, here(paste("data/rmse_out/out_", min(prediction_dates),"_", max(prediction_dates), "_", lag,".csv", sep = "")))
 
 
 
 comparison_list <- mget(ls(pattern="comparison_2021-"), ifnotfound = "Not Found")
 lapply(1:length(comparison_list), function(x) write.csv(comparison_list[[x]],
-                                                         paste("data/rmse_out/comparison", unique(comparison_list[[x]]$date), "_", lag, ".csv", sep = ""),
+                                                        here(paste("data/rmse_out/comparison", unique(comparison_list[[x]]$date), "_", lag, ".csv", sep = "")),
                                                          row.names = F))
 
 
