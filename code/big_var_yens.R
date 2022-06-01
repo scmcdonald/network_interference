@@ -19,8 +19,8 @@ raw_df <- read.csv(here("data/United_States_COVID-19_Cases_and_Deaths_by_State_o
 df <- raw_df %>%
   pivot_wider(names_from = state, values_from = cases) 
 
-actual_benchmark <- read.csv(here("data/actual_benchmark.csv"))
-week_means <- read.csv(here("data/week_mean_predictions.csv"))
+actual_benchmark <- read.csv(here("data/actual_benchmark.csv"), colClasses = c("Date", "character", "numeric"))
+week_means <- read.csv(here("data/week_mean_predictions.csv"), colClasses = c("character", "numeric", "Date", "Date", "Date"))
 
 ### BIGVAR
 
@@ -133,7 +133,8 @@ final$best_method <- str_remove(colnames(final[, c("rmse_pred_Basic", "rmse_pred
 
 
 
-write.csv(final, paste("data/rmse_out/out_", min(prediction_dates),"_", max(prediction_dates), "_", lag,".csv", sep = ""))
+#write.csv(final, paste("data/rmse_out/out_", min(prediction_dates),"_", max(prediction_dates), "_", lag,".csv", sep = ""))
+write.csv(final, paste("data/rmse_out/out_", "2021-11-01","_", "2021-11-08", "_", lag,".csv", sep = ""))
 
 
 
@@ -143,7 +144,7 @@ lapply(1:length(comparison_list), function(x) write.csv(comparison_list[[x]],
                                                          row.names = F))
 
 
-
+# one example coefs
 
 
 

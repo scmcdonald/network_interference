@@ -24,17 +24,17 @@ df <- raw_df %>%
 
 ### BIGVAR
 
-prediction_dates <- as.Date("2021-10-07")
+prediction_dates <- as.Date("2021-10-15")
 states <- sort(colnames(df)[colnames(df) != "date"])
 final <- data.frame()
 data = df
-lag = 5
+lag = 10
 h = 7
 recursive = T
 methods <- c("HLAGC")
 
 
-j <- as.Date("2021-10-07")
+j <- as.Date("2021-10-15")
   # get prediction date, start and end dates of actual data
   actual_end = j - h
   actual_start = actual_end - 365
@@ -69,7 +69,11 @@ j <- as.Date("2021-10-07")
     
     rownames(coefficients) <- states
     
-    colnames(coefficients) <- c("intercept", paste(rep(states, 5), rep(c("L1", "L2", "L3", "L4", "L5"), each = 60), sep = ""))
+    colnames(coefficients) <- c("intercept", paste(rep(states, 10), rep(c("L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10"), each = 60), sep = ""))
+    
+    
+    #saveRDS(coefficients, file = "data/coefficients/coef_10_15_2021_L10_HLAGC.rds")
+    coef_matrix <- readRDS("data/coefficients/coef_10_15_2021_L10_HLAGC.rds")
     
     SparsityPlot.BigVAR.results(result)
     
@@ -77,5 +81,25 @@ j <- as.Date("2021-10-07")
     va <- coefficients["VA", ]
     va_df <- as.data.frame(t(va))
     
+    
+    coefs <- readRDS(file = "data/coefficients/coef_10_15_2021_L10_HLAGC.rds")
+    
+    coefs_no_intercept <- coefs[, -1]
+    
+    coefs_threshold <- coefs_no_intercept
+    coefs_threshold[abs(coefs_threshold) < 0.01] <- 0
+    
+
+    
+    coefs_threshold[, grep(pattern = "L1$", colnames(coefs_threshold))] %>%
+      as.matrix() %>%
+      melt() %>%
+      ggplot(aes(x = Var2, y = Var1)) +
+      geom_raster(aes(fill = abs(value))) +
+      scale_fill_gradient(low="white", high="red") +
+      theme_minimal()
+    
+
+
     
     
