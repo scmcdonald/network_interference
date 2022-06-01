@@ -1,0 +1,63 @@
+here() starts at /home/users/scmcd/network_interference
+Warning message:
+package ‘here’ was built under R version 3.6.3 
+── Attaching packages ─────────────────────────────────────── tidyverse 1.3.1 ──
+✔ ggplot2 3.3.6     ✔ purrr   0.3.4
+✔ tibble  3.1.7     ✔ dplyr   1.0.9
+✔ tidyr   1.2.0     ✔ stringr 1.4.0
+✔ readr   2.1.2     ✔ forcats 0.5.1
+── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+Warning messages:
+1: package ‘tidyverse’ was built under R version 3.6.3 
+2: package ‘ggplot2’ was built under R version 3.6.3 
+3: package ‘tibble’ was built under R version 3.6.3 
+4: package ‘tidyr’ was built under R version 3.6.3 
+5: package ‘readr’ was built under R version 3.6.3 
+6: package ‘purrr’ was built under R version 3.6.3 
+7: package ‘dplyr’ was built under R version 3.6.3 
+8: package ‘stringr’ was built under R version 3.6.3 
+9: package ‘forcats’ was built under R version 3.6.3 
+
+Attaching package: ‘lubridate’
+
+The following objects are masked from ‘package:base’:
+
+    date, intersect, setdiff, union
+
+Warning message:
+package ‘lubridate’ was built under R version 3.6.3 
+Warning message:
+package ‘MASS’ was built under R version 3.6.3 
+Loading required package: strucchange
+Loading required package: zoo
+
+Attaching package: ‘zoo’
+
+The following objects are masked from ‘package:base’:
+
+    as.Date, as.Date.numeric
+
+Loading required package: sandwich
+
+Attaching package: ‘strucchange’
+
+The following object is masked from ‘package:stringr’:
+
+    boundary
+
+Loading required package: urca
+Loading required package: lmtest
+Warning message:
+package ‘vars’ was built under R version 3.6.3 
+Loading required package: lattice
+Warning messages:
+1: package ‘BigVAR’ was built under R version 3.6.3 
+2: In rm(list = exclude, envir = env) : object 'filter' not found
+Warning message:
+package ‘RColorBrewer’ was built under R version 3.6.3 
+Error in charToDate(x) : 
+  character string is not in a standard unambiguous format
+Calls: seq -> as.Date -> as.Date.character -> charToDate
+Execution halted
