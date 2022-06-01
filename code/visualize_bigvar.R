@@ -61,7 +61,10 @@ ggsave("output/bigvar_rmse_5.png", width = 7, height = 12)
 
 # lag = 10
 compare_10 <- read.csv(here("data", "rmse_out", "out_2021-10-07_2021-10-31_10.csv"))
-compare_10_2 <- read.csv(here("data", "rmse_out", "out_2021-11-01_2021-11-08_10.csv"))
+compare_10_2 <- read.csv(here("data", "rmse_out", "out_2021-11-01_2021-11-30_10.csv"))
+compare_10$week_end <- as.Date(x = compare_10$week_end, origin = "1970-01-01")  
+
+compare_10_2$week_end <- as.Date(x = compare_10_2$week_end, origin = "1970-01-01")  
 
 comparison_2 <- rbind(compare_10, compare_10_2)
 
@@ -98,7 +101,7 @@ comparison_2 %>%
        title = "RMSE for VAR(10) by Prediction Date") +
   theme(axis.text.y = element_text(color =text_color$color, face = "bold"), 
         plot.title.position = "plot")
-ggsave("output/bigvar_rmse_10.png", width = 7, height = 6)
+ggsave("output/bigvar_rmse_10.png", width = 7, height = 12)
 
 
 #650x850

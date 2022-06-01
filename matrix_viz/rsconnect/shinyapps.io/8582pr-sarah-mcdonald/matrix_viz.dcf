@@ -1,0 +1,13 @@
+name: matrix_viz
+title:
+username:
+account: 8582pr-sarah-mcdonald
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 6413595
+bundleId: 5969132
+url: https://8582pr-sarah-mcdonald.shinyapps.io/matrix_viz/
+when: 1654115448.22174
+lastSyncTime: 1654115448.22175
+asMultiple: FALSE
+asStatic: FALSE

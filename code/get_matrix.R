@@ -87,19 +87,41 @@ j <- as.Date("2021-10-15")
     coefs_no_intercept <- coefs[, -1]
     
     coefs_threshold <- coefs_no_intercept
-    coefs_threshold[abs(coefs_threshold) < 0.01] <- 0
+    coefs_threshold[abs(coefs_threshold) < 0.05] <- NA
     
 
     
     coefs_threshold[, grep(pattern = "L1$", colnames(coefs_threshold))] %>%
       as.matrix() %>%
       melt() %>%
-      ggplot(aes(x = Var2, y = Var1)) +
-      geom_raster(aes(fill = abs(value))) +
-      scale_fill_gradient(low="white", high="red") +
-      theme_minimal()
+      rename(state = Var1, lag1 = Var2) %>%
+      mutate(lag1 = str_remove(lag1, "L1")) %>%
+      ggplot(aes(x = lag1, y = state)) +
+      geom_tile(aes(fill = value), color = "white") +
+      scale_fill_gradient2(low = cb_colors[2],
+                           mid = "white",
+                           high = cb_colors[1], 
+                           na.value = "grey70"
+                          ) +
+      theme_minimal() + 
+      labs(y = "State", x = "L1", caption = "Threshold: 0.05")
     
+   t <-  coefs_threshold[, grep(pattern = "L2$", colnames(coefs_threshold))] %>%
+      as.matrix() %>%
+      melt() %>%
+      rename(state = Var1, lag1 = Var2) %>%
+      mutate(lag1 = str_remove(lag1, "L2")) %>%
+      ggplot(aes(x = lag1, y = state)) +
+      geom_tile(aes(fill = value), color = "white") +
+      scale_fill_gradient2(low = cb_colors[2],
+                           mid = "white",
+                           high = cb_colors[1], 
+                           na.value = "grey70"
+      ) +
+      theme_minimal() + 
+      labs(y = "State", x = "L1", caption = "Threshold: 0.05")  
 
 
-    
+
+   ggplotly(t) 
     
