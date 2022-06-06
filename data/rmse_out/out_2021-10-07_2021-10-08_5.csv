@@ -1,0 +1,3 @@
+"","prediction_date","actual_start","actual_end","week_start","week_end","lag","period","rmse_pred_Basic","rmse_pred_HLAGC","rmse_pred_HLAGOO","rmse_pred_HLAGELEM","rmse_pred_week_means","best_method"
+"1",18907,18535,18900,18894,18900,5,7,0.54563894552003,0.51323282334551,0.821855025149247,0.697367413262332,0.415924186439152,"week_means"
+"2",18908,18536,18901,18895,18901,5,7,0.555750981810418,0.544009175352132,0.790110576842887,0.680560214407635,0.492523814382615,"week_means"
