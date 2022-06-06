@@ -81,7 +81,7 @@ for(j in prediction_dates){
     
     print(paste(j, i, "complete"))
     
-    saveRDS(result, file = paste("data/result/result_", j, "_L", lag, "_" , i, ".rds", sep = ""))
+    saveRDS(result, file = here( paste("data/result/result_", j, "_L", lag, "_" , i, ".rds", sep = "")))
     
     coefficients <- coef(result)
     
@@ -91,7 +91,7 @@ for(j in prediction_dates){
                                                    rep(paste("L", 1:lag, sep = ""), each = 60), sep = ""))
     
     
-    saveRDS(coefficients, file =  paste("data/coefficients/coef_", j, "_L", lag, "_" , i, ".rds", sep = ""))
+    saveRDS(coefficients, file = here( paste("data/coefficients/coef_", j, "_L", lag, "_" , i, ".rds", sep = "")))
     
   }
   print("bigvar done")
