@@ -9,4 +9,4 @@
 #SBATCH --mail-user=scmcd@stanford.edu
 
 ml R
-Rscript big_var_yens.R
+Rscript bigvar_yens.R

@@ -20,11 +20,8 @@ df <- raw_df %>%
   pivot_wider(names_from = state, values_from = cases) 
 
 actual_benchmark <- read.csv(here("data/actual_benchmark.csv"), colClasses = c("Date", "character", "numeric"))
-<<<<<<< HEAD
+
 week_means <- read.csv(here("data/week_mean_predictions.csv"), colClasses = c("character", "numeric", "Date", "Date", "Date"))
-=======
-week_means <- read.csv(here("data/week_mean_predictions.csv"), , colClasses = c("character", "numeric", "Date", "Date", "Date"))
->>>>>>> e8020de34e34553a730f3686b6be881d9aa41282
 
 ### BIGVAR
 
@@ -72,6 +69,7 @@ for(j in prediction_dates){
                          dates = as.character(train_dates))
     
     result <- cv.BigVAR(mod)
+  
     
     pred <- predict(result, n.ahead = h)%>%
       as.data.frame() %>%
@@ -82,6 +80,19 @@ for(j in prediction_dates){
     predictions <- left_join(predictions, pred, by = c("state", "date"))
     
     print(paste(j, i, "complete"))
+    
+    saveRDS(result, file = here( paste("data/result/result_", j, "_L", lag, "_" , i, ".rds", sep = "")))
+    
+    coefficients <- coef(result)
+    
+    rownames(coefficients) <- states
+    
+    colnames(coefficients) <- c("intercept", paste(rep(states, lag), 
+                                                   rep(paste("L", 1:lag, sep = ""), each = 60), sep = ""))
+    
+    
+    saveRDS(coefficients, file = here( paste("data/coefficients/coef_", j, "_L", lag, "_" , i, ".rds", sep = "")))
+    
   }
   print("bigvar done")
 
@@ -141,14 +152,14 @@ final$best_method <- str_remove(colnames(final[, c("rmse_pred_Basic", "rmse_pred
 
 
 
-write.csv(final, here(paste("data/rmse_out/out_", min(prediction_dates),"_", max(prediction_dates), "_", lag,".csv", sep = "")))
+write.csv(final, here(paste("data/rmse_out/out_", min(prediction_dates),"_", max(prediction_dates), "_L", lag,".csv", sep = "")))
 
 
 
 
 comparison_list <- mget(ls(pattern="comparison_2021-"), ifnotfound = "Not Found")
 lapply(1:length(comparison_list), function(x) write.csv(comparison_list[[x]],
-                                                        here(paste("data/rmse_out/comparison", unique(comparison_list[[x]]$date), "_", lag, ".csv", sep = "")),
+                                                        here(paste("data/rmse_out/comparison", unique(comparison_list[[x]]$date), "_L", lag, ".csv", sep = "")),
                                                          row.names = F))
 
 
