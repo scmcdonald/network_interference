@@ -1,0 +1,163 @@
+---
+title: "Matrices"
+author: "Sarah McDonald"
+date: "7/19/2022"
+output: html_document
+---
+
+__Purpose:__
+
+This script runs the VAR and BigVar models on our simulated dataset.
+
+I show all combinations for $n = \{4, 10, 20\}$ and $t = \{100, 200, 500\}$
+
+__Takeaways:__
+
+- None of the BigVAR model coefficients look like we would expect. Most are 0. 
+
+- When $n = 200$ in the VAR model, there is some strange behavior. The coefficients become quite large, and some become NA. Still, the nonmissing diagonals are very close to what we would expect. Still wanted to flag this as strange behavior.
+
+
+```{r, warning = F, message=F}
+library(igraph)
+library(tidyverse)
+library(BigVAR)
+library(vars)
+
+
+models <- function(n, t){
+  set.seed(4)
+  N = n
+  s_epsilon = 0
+  s_alpha = 0
+  s_beta = 0
+  
+  p = 1/N
+  
+  rho_1 = runif(N, min = 0.7, max = 1.3)
+  rho_2 = 0
+  
+  
+  y_0 = rep(0, N)
+  
+  
+  alpha = rnorm(N, mean = 0, sd = s_alpha)
+  beta = rnorm(N, mean = 0, sd = s_beta)
+  epsilon = rnorm(N, mean = 0, sd = s_epsilon)
+  
+  
+  G <- erdos.renyi.game(N, p, type=c("gnp"), directed = FALSE, loops = F) %>%
+    as_adjacency_matrix(sparse = F)
+  
+  
+  periods = t
+  Y <- matrix(nrow = N, ncol = periods + 1)
+  colnames(Y) <- 0:periods
+  
+  Y[, "0"] <- rnorm(N, mean = 0, sd = 1)
+  
+  for(t1 in 1:periods){
+    
+    t = t1 - 1
+    
+    y_t <- Y[, paste(t)]
+    
+    
+    y_t1 <- alpha + beta + rho_1 * y_t + (rho_2 * G %*% y_t )+ epsilon
+    
+    Y[, paste(t1)] <- y_t1
+    
+  }
+  
+  identity = diag(N)
+  
+  comparison_matrix = ((rho_1 * identity) +( rho_2 *G))
+  
+  # big var
+  big_var_model=BigVAR.fit(t(Y),p = 1,
+                   struct = "Basic",
+                   lambda=1e-20, 
+                   intercept=F)
+  
+  big_var_mod_subset <- big_var_model[,,1]
+  
+  
+  
+  # var
+  model <- VAR(t(Y), p = 1)
+  
+  model_matrix <-  t(as.data.frame(lapply(model$varresult, `[[`, 1)))
+  
+  
+  
+  rownames(model_matrix) <- paste("y", 1:N, sep = "")
+  
+  return(
+    list(
+      paste("rho_1:"),
+      rho_1,
+     # paste("Comparison Matrix:"),
+   # format(round(comparison_matrix, 10), scientific = F),
+      paste("VAR Matrix:"),
+
+      #format(model_matrix, scientific = F),
+      format(round(model_matrix, 10), scientific = F),
+    
+          paste("BigVAR Matrix:"),
+    #format(big_var_mod_subset, scientific = F),
+    format(round(big_var_mod_subset, 10), scientific=F))
+  )
+}
+
+```
+
+
+
+## Output {.tabset}
+
+### T = 100 {.tabset}
+
+#### n = 4
+```{r, warning = F, message=F}
+models(4, 100)
+```
+#### n = 10
+```{r, warning = F, message=F}
+models(10, 100)
+```
+#### n = 20
+```{r, warning = F, message=F}
+models(20, 100)
+```
+
+### T = 200 {.tabset}
+
+#### n = 4
+```{r, warning = F, message=F}
+models(4, 200)
+```
+#### n = 10
+```{r, warning = F, message=F}
+models(10, 200)
+```
+#### n = 20
+```{r, warning = F, message=F}
+models(20, 200)
+```
+
+### T = 500 {.tabset}
+
+#### n = 4
+```{r, warning = F, message=F}
+models(4, 500)
+```
+#### n = 10
+```{r, warning = F, message=F}
+models(10, 500)
+```
+#### n = 20
+```{r, warning = F, message=F}
+models(20, 500)
+```
+
+
