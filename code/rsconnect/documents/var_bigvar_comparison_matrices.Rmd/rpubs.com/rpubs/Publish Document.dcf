@@ -1,0 +1,11 @@
+name: Publish Document
+title:
+username:
+account: rpubs
+server: rpubs.com
+hostUrl: rpubs.com
+appId: https://api.rpubs.com/api/v1/document/925553/e7c930f677614086b87a358a9cbf6df6
+bundleId: https://api.rpubs.com/api/v1/document/925553/e7c930f677614086b87a358a9cbf6df6
+url: http://rpubs.com/scmcdonald/925553
+when: 1658945408.45946
+lastSyncTime: 1658945408.45947

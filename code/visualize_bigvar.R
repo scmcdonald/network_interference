@@ -59,7 +59,7 @@ lag5 %>%
        title = "RMSE for VAR(5) by Prediction Date") +
   theme(axis.text.y = element_text(color =text_color$color, face = "bold"), 
         plot.title.position = "plot")
-ggsave("output/bigvar_rmse_5.png", width = 7, height = 12)
+ggsave("figures/bigvar_rmse_5.png", width = 7, height = 12)
 
 
 
@@ -99,7 +99,48 @@ lag10 %>%
        title = "RMSE for VAR(10) by Prediction Date") +
   theme(axis.text.y = element_text(color =text_color$color, face = "bold"), 
         plot.title.position = "plot")
-ggsave("output/bigvar_rmse_10.png", width = 7, height = 12)
+ggsave("figures/bigvar_rmse_10.png", width = 7, height = 12)
+
+
+# lag = 15
+
+lag15 <- do.call(rbind, lapply(list.files("data/rmse_out", pattern="^out_.*_L15\\.csv", full.names = T),function(x)
+  read.csv(x))) %>%
+  mutate(week_end = as.Date(x = week_end, origin = "1970-01-01"),
+         prediction_date = as.Date(x = prediction_date, origin = "1970-01-01"))
+
+text_color <- lag15 %>%
+  select(prediction_date, best_method) %>%
+  mutate(color = case_when(best_method == "week_means" ~ "black",
+                           best_method == "Basic" ~ cb_colors[1],
+                           best_method == "HLAGC" ~ cb_colors[2],
+                           best_method == "HLAGELEM" ~ cb_colors[3],
+                           best_method == "HLAGOO" ~ cb_colors[4],
+                           TRUE ~ "red")) %>%
+  distinct()
+
+
+lag15 %>%
+  select(prediction_date, rmse_pred_Basic, rmse_pred_HLAGC, rmse_pred_HLAGELEM, rmse_pred_HLAGOO, rmse_pred_week_means) %>%
+  pivot_longer(!prediction_date, names_to = "rmse_name", values_to = "rmse_value") %>%
+  group_by(prediction_date) %>%
+  mutate(rmse_min= ifelse(rmse_value == min(rmse_value), 1, 0), 
+         best_rmse =rmse_name[which.max(rmse_min)]) %>%
+  ggplot(aes(x = as.numeric(prediction_date), y = rmse_value, color = rmse_name)) +
+  geom_point(size = 3) + 
+  scale_color_manual(name = "RMSE", values = c(cb_colors[1:4], "black"), 
+                     labels = c("Basic", "HLAGC", "HALGELEM", "HLAGOO", "Week Means")) +
+  scale_x_reverse(labels = as.character(format(lag15$prediction_date, format = "%b %d")),                     
+                  breaks = as.numeric(lag15$prediction_date)) + 
+  scale_y_continuous(limits = c(0,5))+ 
+  theme_minimal() +
+  coord_flip()  +
+  labs(x = "Date (2021)", 
+       y = "RMSE", 
+       title = "RMSE for VAR(15) by Prediction Date") +
+  theme(axis.text.y = element_text(color =text_color$color, face = "bold"), 
+        plot.title.position = "plot")
+ggsave("figures/bigvar_rmse_15.png", width = 7, height = 12)
 
 
 # lag = 20
@@ -139,7 +180,7 @@ lag20 %>%
        title = "RMSE for VAR(20) by Prediction Date") +
   theme(axis.text.y = element_text(color =text_color$color, face = "bold"), 
         plot.title.position = "plot")
-ggsave("output/bigvar_rmse_20.png", width = 7, height = 12)
+ggsave("figures/bigvar_rmse_20.png", width = 7, height = 12)
 
 
 
@@ -148,6 +189,7 @@ ggsave("output/bigvar_rmse_20.png", width = 7, height = 12)
 
 as.data.frame(rbind(c(table(lag5$best_method), lag = 5),
       c(table(lag10$best_method), lag = 10),
+      c(table(lag15$best_method), lag = 15),
       c(table(lag20$best_method), lag = 20))) %>%
   pivot_longer(cols = !lag, names_to = "best_method", values_to = "count")  %>%
   ggplot(aes(x = as.factor(lag), y = count,  fill = best_method)) +
@@ -155,13 +197,13 @@ as.data.frame(rbind(c(table(lag5$best_method), lag = 5),
   scale_fill_manual(values = c(cb_colors[1], cb_colors[2],
                                cb_colors[3], cb_colors[4], "black")) +
   coord_flip() +
-  scale_x_discrete(labels = c("Lag 5", "Lag 10", "Lag 20"))+
+  scale_x_discrete(labels = c("Lag 5", "Lag 10", "Lag 15", "Lag 20"))+
   theme_minimal() + 
   labs(x = "", y = "Count", fill = "Best Method") + 
   scale_y_continuous(breaks = seq(0, 55, 5)) +
   custom_theme
 
-ggsave("output/best_method_by_lag.png", width = 12, height = 5)
+ggsave("figures/best_method_by_lag.png", width = 12, height = 5)
 
 
 average_rmses <- as.data.frame(rbind(
@@ -172,6 +214,9 @@ average_rmses <- as.data.frame(rbind(
   c(lag10 %>%
     select(rmse_pred_Basic, rmse_pred_HLAGC, rmse_pred_HLAGELEM, rmse_pred_HLAGOO, rmse_pred_week_means) %>%
     colMeans, lag = 10),
+  c(lag15 %>%
+      select(rmse_pred_Basic, rmse_pred_HLAGC, rmse_pred_HLAGELEM, rmse_pred_HLAGOO, rmse_pred_week_means) %>%
+      colMeans, lag = 15),
   
   c(lag20 %>%
     select(rmse_pred_Basic, rmse_pred_HLAGC, rmse_pred_HLAGELEM, rmse_pred_HLAGOO, rmse_pred_week_means) %>%
@@ -183,7 +228,6 @@ average_rmses <- as.data.frame(rbind(
 average_rmses %>%
   ggplot(aes(x = lag, y = avg_rmse, color = method)) + 
   geom_point(size = 3) + 
-
   scale_color_manual(values = c(cb_colors[1], cb_colors[2],
                                cb_colors[3], cb_colors[4], "black")) +
   geom_line() +
@@ -198,10 +242,10 @@ average_rmses %>%
          legend.position = "none") +
   scale_x_continuous(
     limits = c(5, 22),
-    breaks = c(5, 10, 20),
-    labels = c("Lag 5", "Lag 10", "Lag 20")) +
+    breaks = c(5, 10, 15, 20),
+    labels = c("Lag 5", "Lag 10", "Lag 15", "Lag 20")) +
   coord_cartesian(
     clip = "off"
   ) 
-ggsave("output/avg_rmse.png", width = 9, height = 5)
+ggsave("figures/avg_rmse.png", width = 9, height = 5)
 

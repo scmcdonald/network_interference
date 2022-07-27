@@ -2,7 +2,12 @@
 title: "Matrices"
 author: "Sarah McDonald"
 date: "7/19/2022"
-output: html_document
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 6
+    toc_float: yes
 ---
 
 __Purpose:__
@@ -23,25 +28,28 @@ library(igraph)
 library(tidyverse)
 library(BigVAR)
 library(vars)
+library(knitr)
+library(kableExtra)
 
-
-models <- function(n, t){
+models <- function(n, t, rho_1_mod, rho_2_mod=0, p_num, s_alpha_input, s_epsilon_input){
   set.seed(4)
   N = n
-  s_epsilon = 0
-  s_alpha = 0
+  s_epsilon = s_epsilon_input
+  s_alpha = s_alpha_input
   s_beta = 0
   
-  p = 1/N
+  p = p_num/N
   
-  rho_1 = runif(N, min = 0.7, max = 1.3)
-  rho_2 = 0
+  rho_1 = rho_1_mod
+  rho_2 = rho_2_mod
   
   
   y_0 = rep(0, N)
   
   
   alpha = rnorm(N, mean = 0, sd = s_alpha)
+  
+  # beta is the same as time dimension, for each time stamp there is a time value, when we eventually turn it on
   beta = rnorm(N, mean = 0, sd = s_beta)
   epsilon = rnorm(N, mean = 0, sd = s_epsilon)
   
@@ -74,12 +82,12 @@ models <- function(n, t){
   comparison_matrix = ((rho_1 * identity) +( rho_2 *G))
   
   # big var
-  big_var_model=BigVAR.fit(t(Y),p = 1,
-                   struct = "Basic",
-                   lambda=1e-20, 
-                   intercept=F)
+ # big_var_model=BigVAR.fit(t(Y),p = 1,
+  #                 struct = "Basic",
+  #                 lambda=1e-20, 
+ #                  intercept=F)
   
-  big_var_mod_subset <- big_var_model[,,1]
+#  big_var_mod_subset <- big_var_model[,,1]
   
   
   
@@ -92,23 +100,27 @@ models <- function(n, t){
   
   rownames(model_matrix) <- paste("y", 1:N, sep = "")
   
-  return(
-    list(
-      paste("rho_1:"),
-      rho_1,
-     # paste("Comparison Matrix:"),
-   # format(round(comparison_matrix, 10), scientific = F),
-      paste("VAR Matrix:"),
+ # return(
+  #  list(
+  #    print("rho_1:"), print(rho_1),
+  #    print("VAR Matrix:"), print(format(round(model_matrix, 10), scientific = F)),
+  #    print("Alpha"), print(alpha),
+  #    print("Epsilon"), print(epsilon),
+   
+  # print("Adjacency Matrix"), print(G)
+         # paste("BigVAR Matrix:"),
+  #  format(round(big_var_mod_subset, 10), scientific=F)
+  #)
+  #)
+  
+  return(list(list("Rho_1:", rho_1), 
+              list("Alpha: ", alpha), 
+              list("Epsilon:", epsilon), 
+              list("VAR Matrix:", format(round(model_matrix, 10), scientific = F)),
+              list("Adjaceny Matrix:", G)))
 
-      #format(model_matrix, scientific = F),
-      format(round(model_matrix, 10), scientific = F),
-    
-          paste("BigVAR Matrix:"),
-    #format(big_var_mod_subset, scientific = F),
-    format(round(big_var_mod_subset, 10), scientific=F))
-  )
+  
 }
-
 ```
 
 
@@ -119,45 +131,344 @@ models <- function(n, t){
 
 #### n = 4
 ```{r, warning = F, message=F}
-models(4, 100)
+N= 4
+models(n = N, t = 100, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 #### n = 10
 ```{r, warning = F, message=F}
-models(10, 100)
+N= 10
+models(n = N, t = 100, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+
 ```
 #### n = 20
 ```{r, warning = F, message=F}
-models(20, 100)
+N= 20
+models(n = N, t = 100, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 
 ### T = 200 {.tabset}
 
 #### n = 4
 ```{r, warning = F, message=F}
-models(4, 200)
+N= 4
+models(n = N, t = 200, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 #### n = 10
 ```{r, warning = F, message=F}
-models(10, 200)
+N= 10
+models(n = N, t = 200, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 #### n = 20
 ```{r, warning = F, message=F}
-models(20, 200)
+N= 20
+models(n = N, t = 200, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 
 ### T = 500 {.tabset}
 
 #### n = 4
 ```{r, warning = F, message=F}
-models(4, 500)
+N= 4
+models(n = N, t = 500, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 #### n = 10
 ```{r, warning = F, message=F}
-models(10, 500)
+N= 10
+models(n = N, t = 500, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 #### n = 20
 ```{r, warning = F, message=F}
-models(20, 500)
+N= 20
+models(n = N, t = 500, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
+
+
+
+
+## Output - Random Normal {.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(n = N, t = 200, rho_1_mod = rnorm(N), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+```
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(n = N, t = 500, rho_1_mod = rnorm(N), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+```
+
+
+
+## Output - smaller uniform range{.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+
+models(n = N, t = 200, rho_1_mod = runif(N, min = 0.95, max = 1.05), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+
+
+```
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(n = N, t = 500, rho_1_mod = runif(N, min = 0.95, max = 1.05), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+```
+
+## Output - smaller number range [0.7, 0.9]{.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N = 10
+models(n = N, t = 200, rho_1_mod = runif(N, min = 0.7, max = 0.9), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+```
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N = 10
+models(n = N, t = 500, rho_1_mod = runif(N, min = 0.7, max = 0.9), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+```
+
+
+## Output - big number range [-1, 1] {.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(n = N, t = 200, rho_1_mod =runif(N, min = -1, max = 1), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+```
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(n = N, t = 500, rho_1_mod =runif(N, min = -1, max = 1), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
+```
+
+
+# new Rho_2
+
+
+
+
+
+
+## Rho_2 = 1/N, p numerator= 3 {.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 200, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input =0, s_epsilon_input=0)
+```
+
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 500, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input =0, s_epsilon_input=0)
+```
+
+
+
+
+
+
+## Rho_2 = 1/N, p numerator= 3, s_alpha = 0.1 {.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 200, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 0.1, s_epsilon_input=0)
+```
+
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 500, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 0.1, s_epsilon_input=0)
+```
+
+
+## Rho_2 = 1/N, p numerator= 3, s_alpha = 0.1, s_epsilon = 0.1 {.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 200, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 0.1, s_epsilon_input=0.1)
+```
+
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 500, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 0.1, s_epsilon_input=0.1)
+```
+
+
+
+
+## Rho_2 = 1/N, p numerator= 3, s_alpha = 1, s_epsilon = 0.1 {.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 200, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 1, s_epsilon_input=0.1)
+```
+
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 500, rho_1_mod = runif(N, min = -1, max = 1), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 1, s_epsilon_input=0.1)
+```
+
+
+## rho_1 = 1 Rho_2 = 1/N, p numerator= 3, s_alpha = 1, s_epsilon = 0.1 {.tabset}
+
+### T = 200 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 200, rho_1_mod = rep(1, N), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 1, s_epsilon_input=0.1)
+```
+
+
+### T = 500 {.tabset}
+
+#### n = 10
+```{r, warning = F, message=F}
+N= 10
+models(N, 500, rho_1_mod =rep(1, N), rho_2_mod = 1/N, p_num = 3, s_alpha_input = 1, s_epsilon_input=0.1)
+```
+
+
+
+
+# How big can T be given N?
+
+We want to lower T and see if T needs to scale with N or N^2.
+
+In the table, I show different $\rho_1$, sample size $N$, and values $t$ configurations. I count "weird" behavior: (1) number of NA columns outputed and (2) number of large coefficients, where the absolute value of the coefficient must be greater than 10 to be flagged as a large coefficients.
+
+Below, we list all possibilities for $N$, $t$, and $\rho_1$:
+
+$N \in \{4, 10, 20, 25\}$
+
+$t(n) \in \{n + 2, n^2 + n +1\}$
+
+$\rho_1 \in \{Unif[0.7, 1.3], Unif[.95, 1.05], Unif[-1, 1], N(0, 1)\}$
+
+
+
+The blue highlighted rows indicate rows without any atypical behavior. 
+
+
+
+For $N \geq 30$, I am finding that VAR breaks at $t(n) = N^2 + N + 1$. This is the specific error: `Error in VAR(t(Y), p = 1) : 
+NAs in y.`
+
+
+
+
+```{r, warning=F, message=F}
+N_list <- c(4, 10, 20, 25)
+p_num_list <- c(1, 3)
+
+rho_1_list <- c("unif_0.7_1.3", "unif_0.95_1.05", "unif_-1_1", "std_normal")
+t_type_list <- c("N", "N-squared")
+
+
+# df of all configurations!
+df <- data.frame(N = rep(N_list, each = length(t_type_list)*length(rho_1_list) * length(p_num_list)), 
+                 rho_1 = rep(rep(rho_1_list, each=length(t_type_list)*length(p_num_list)), length(N_list)), 
+                 p_num = rep(rep(p_num_list, each = length(t_type_list)), length(rho_1_list)*length(N_list)), 
+                 t_type = rep(t_type_list, length(p_num_list)* length(N_list)* length(rho_1_list)), 
+                 t = NA,
+                 NA_cols = NA,
+                 large_coefs = NA, rho_2_mod=0,  s_alpha_input = 0, s_epsilon_input = 0) %>%
+  mutate(t = case_when(t_type== "N" ~ N + 2,
+                       t_type== "N-squared" ~ N^2 + N+ 1))
+
+for(N in N_list){
+  set.seed(1)
+  rho_1_list <- list(`unif_0.7_1.3`= runif(N, min = 0.7, max = 1.3), 
+                     `unif_0.95_1.05` = runif(N, min = 0.95, max = 1.05), 
+                     `unif_-1_1` = runif(N, min = -1, max = 1),
+                     std_normal =  rnorm(N))
+  
+  t_list <- list(`n` = N+2, `n_squared` = N^2 + N +1)
+  
+  for(i in names(rho_1_list)){
+    rho_1_name <- i
+    rho_1_value <- rho_1_list[[i]]
+    
+    for(j in t_list){
+      
+      for(k in p_num_list){
+      
+      m <- models(n = N, t = j, rho_1_mod = rho_1_value, rho_2_mod=0, p_num = k, s_alpha_input = 0, s_epsilon_input = 0)[[4]][[2]]
+      class(m) <- "numeric"
+      
+      # number of large coefficients
+      df[df$N == N & df$rho_1 == rho_1_name & df$t == j & df$p_num == k, "large_coefs"] <- sum(abs(m)> 10, na.rm = T)
+     
+      # number of NA columns
+      df[df$N == N & df$rho_1 == rho_1_name & df$t == j & df$p_num == k, "NA_cols"] <- length(colnames(m)[colSums(is.na(m)) > 0])
+      }
+    }
+  }
+}
+
+
+kable(df) %>%
+  kable_styling() %>%
+  row_spec(which(df$NA_cols == 0 & df$large_coefs == 0), background = "lightblue") %>%
+  scroll_box(height = "500px")
+
+```
+
+
+
+
+
+
+
+
+
 
 
