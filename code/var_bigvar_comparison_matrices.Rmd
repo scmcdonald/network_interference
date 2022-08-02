@@ -10,6 +10,8 @@ output:
     toc_float: yes
 ---
 
+# Introduction
+
 __Purpose:__
 
 This script runs the VAR and BigVar models on our simulated dataset.
@@ -23,6 +25,8 @@ __Takeaways:__
 - When $n = 200$ in the VAR model, there is some strange behavior. The coefficients become quite large, and some become NA. Still, the nonmissing diagonals are very close to what we would expect. Still wanted to flag this as strange behavior.
 
 
+# Function
+
 ```{r, warning = F, message=F}
 library(igraph)
 library(tidyverse)
@@ -30,9 +34,13 @@ library(BigVAR)
 library(vars)
 library(knitr)
 library(kableExtra)
+library(Matrix)
+options(scipen=20)
+```
 
-models <- function(n, t, rho_1_mod, rho_2_mod=0, p_num, s_alpha_input, s_epsilon_input){
-  set.seed(4)
+```{r, warning = F, message=F}
+models <- function(n, t, rho_1_mod, rho_2_mod, p_num, s_alpha_input, s_epsilon_input){
+  
   N = n
   s_epsilon = s_epsilon_input
   s_alpha = s_alpha_input
@@ -46,7 +54,7 @@ models <- function(n, t, rho_1_mod, rho_2_mod=0, p_num, s_alpha_input, s_epsilon
   
   y_0 = rep(0, N)
   
-  
+  set.seed(4)
   alpha = rnorm(N, mean = 0, sd = s_alpha)
   
   # beta is the same as time dimension, for each time stamp there is a time value, when we eventually turn it on
@@ -76,6 +84,8 @@ models <- function(n, t, rho_1_mod, rho_2_mod=0, p_num, s_alpha_input, s_epsilon
     Y[, paste(t1)] <- y_t1
     
   }
+  
+  det(Y[1:n, 1:n])
   
   identity = diag(N)
   
@@ -113,19 +123,27 @@ models <- function(n, t, rho_1_mod, rho_2_mod=0, p_num, s_alpha_input, s_epsilon
   #)
   #)
   
-  return(list(list("Rho_1:", rho_1), 
+  return(list(
+              list("Rho_1:", rho_1), 
               list("Alpha: ", alpha), 
               list("Epsilon:", epsilon), 
               list("VAR Matrix:", format(round(model_matrix, 10), scientific = F)),
-              list("Adjaceny Matrix:", G)))
+              list("Adjaceny Matrix:", G), 
+              list("Determinant", det(Y[1:n, 1:n])),
+              list("Rank", rankMatrix(Y)),
+              list("comparison matrix:", comparison_matrix), 
+              list("frobenius norm", norm(model_matrix[, 1:nrow(model_matrix)] - comparison_matrix, type = "F")),
+              list("rank_of_square", rankMatrix(Y[1:n, 1:n]))))
 
   
 }
+
 ```
 
 
+# Output
 
-## Output {.tabset}
+## Uniform [0.7, 1.3] {.tabset}
 
 ### T = 100 {.tabset}
 
@@ -185,7 +203,7 @@ models(n = N, t = 500, rho_1_mod = runif(N, min = 0.7, max = 1.3), rho_2_mod=0, 
 
 
 
-## Output - Random Normal {.tabset}
+## Standard Normal {.tabset}
 
 ### T = 200 {.tabset}
 
@@ -205,7 +223,7 @@ models(n = N, t = 500, rho_1_mod = rnorm(N), rho_2_mod=0, p_num = 1, s_alpha_inp
 
 
 
-## Output - smaller uniform range{.tabset}
+## Uniform [0.95, 1.05] {.tabset}
 
 ### T = 200 {.tabset}
 
@@ -226,7 +244,7 @@ N= 10
 models(n = N, t = 500, rho_1_mod = runif(N, min = 0.95, max = 1.05), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
 
-## Output - smaller number range [0.7, 0.9]{.tabset}
+## Uniform [0.7, 0.9] {.tabset}
 
 ### T = 200 {.tabset}
 
@@ -245,7 +263,7 @@ models(n = N, t = 500, rho_1_mod = runif(N, min = 0.7, max = 0.9), rho_2_mod=0, 
 ```
 
 
-## Output - big number range [-1, 1] {.tabset}
+## Uniform [-1, 1] {.tabset}
 
 ### T = 200 {.tabset}
 
@@ -262,13 +280,6 @@ models(n = N, t = 200, rho_1_mod =runif(N, min = -1, max = 1), rho_2_mod=0, p_nu
 N= 10
 models(n = N, t = 500, rho_1_mod =runif(N, min = -1, max = 1), rho_2_mod=0, p_num = 1, s_alpha_input = 0, s_epsilon_input = 0)
 ```
-
-
-# new Rho_2
-
-
-
-
 
 
 ## Rho_2 = 1/N, p numerator= 3 {.tabset}
@@ -403,72 +414,215 @@ For $N \geq 30$, I am finding that VAR breaks at $t(n) = N^2 + N + 1$. This is t
 NAs in y.`
 
 
-
+## Original
 
 ```{r, warning=F, message=F}
 N_list <- c(4, 10, 20, 25)
 p_num_list <- c(1, 3)
-
 rho_1_list <- c("unif_0.7_1.3", "unif_0.95_1.05", "unif_-1_1", "std_normal")
 t_type_list <- c("N", "N-squared")
+rho_2_mod=0
+s_alpha_input = 0
+s_epsilon_input = 0
 
 
 # df of all configurations!
-df <- data.frame(N = rep(N_list, each = length(t_type_list)*length(rho_1_list) * length(p_num_list)), 
-                 rho_1 = rep(rep(rho_1_list, each=length(t_type_list)*length(p_num_list)), length(N_list)), 
-                 p_num = rep(rep(p_num_list, each = length(t_type_list)), length(rho_1_list)*length(N_list)), 
-                 t_type = rep(t_type_list, length(p_num_list)* length(N_list)* length(rho_1_list)), 
-                 t = NA,
-                 NA_cols = NA,
-                 large_coefs = NA, rho_2_mod=0,  s_alpha_input = 0, s_epsilon_input = 0) %>%
+df <- expand.grid(N = N_list, 
+            p_num = p_num_list, 
+            rho_1 = rho_1_list, 
+            t_type = t_type_list, 
+            rho_2 = rho_2_mod, 
+            s_epsilon_input = s_epsilon_input,
+            t = NA, 
+            NA_cols = NA,
+            NA_constant = NA,
+            large_coefs = NA, 
+            det = NA,
+            rank = NA,
+            frobenius_norm = NA,
+            rank_of_square = NA,
+            s_alpha_input = s_alpha_input)%>%
   mutate(t = case_when(t_type== "N" ~ N + 2,
-                       t_type== "N-squared" ~ N^2 + N+ 1))
+                       t_type== "N-squared" ~ N^2 + N+ 1, 
+                       t_type == "Larger than N-squared" ~ 2*N^2),
+         id = 1:nrow(.))
 
-for(N in N_list){
+# loop over df rows for each specification
+for(i in 1:nrow(df)){
   set.seed(1)
-  rho_1_list <- list(`unif_0.7_1.3`= runif(N, min = 0.7, max = 1.3), 
-                     `unif_0.95_1.05` = runif(N, min = 0.95, max = 1.05), 
-                     `unif_-1_1` = runif(N, min = -1, max = 1),
-                     std_normal =  rnorm(N))
+  # compute rho1 values
+
+  rho_1_value <- if(df[i, "rho_1"] == "unif_-1_1"){
+     runif(df[i, "N"], -1, 1)
+  } else if(df[i, "rho_1"] == "unif_0.95_1.05"){
+     runif(df[i, "N"], 0.95, 1.05)
+  } else if(df[i, "rho_1"] == "unif_0.7_1.3"){
+     runif(df[i, "N"], 0.7, 1.3)
+  } else if(df[i, "rho_1"] == "std_normal"){
+     rnorm(df[i, "N"])
+  } 
   
-  t_list <- list(`n` = N+2, `n_squared` = N^2 + N +1)
+  set.seed(235)
+  # get model
+  mod <- models(n = df[i, "N"], t = df[i, "t"], 
+              rho_1_mod = rho_1_value, 
+              rho_2_mod=df[i, "rho_2"], 
+              p_num = df[i, "p_num"], 
+              s_alpha_input = df[i, "s_alpha_input"], 
+              s_epsilon_input = df[i, "s_epsilon_input"])
+
+  m <- mod[[4]][[2]]
+  class(m) <- "numeric"
+      
+  # number of large coefficients
+  df[i, "large_coefs"] <- sum(abs(m)> 10, na.rm = T)
+
+  # number of NA columns
+  df[i, "NA_cols"] <- length(colnames(m)[colSums(is.na(m)) > 0])
   
-  for(i in names(rho_1_list)){
-    rho_1_name <- i
-    rho_1_value <- rho_1_list[[i]]
+  # is the constant column = NA, if NA_cols = 1
+  df[i, "NA_constant"] <- sum(is.na(m[, "const"])) == length(m[, "const"])
+  # det of Y[1:n, 1:n]
+    df[i, "det"] <- round(mod[[6]][[2]], 20)
+
+    # full Y matrix rank
+    df[i, "rank"] <-  mod[[7]][[2]][1]
     
-    for(j in t_list){
+    # frobenius norm
+      df[i, "frobenius_norm"] <- round(mod[[9]][[2]], 10)
       
-      for(k in p_num_list){
-      
-      m <- models(n = N, t = j, rho_1_mod = rho_1_value, rho_2_mod=0, p_num = k, s_alpha_input = 0, s_epsilon_input = 0)[[4]][[2]]
-      class(m) <- "numeric"
-      
-      # number of large coefficients
-      df[df$N == N & df$rho_1 == rho_1_name & df$t == j & df$p_num == k, "large_coefs"] <- sum(abs(m)> 10, na.rm = T)
-     
-      # number of NA columns
-      df[df$N == N & df$rho_1 == rho_1_name & df$t == j & df$p_num == k, "NA_cols"] <- length(colnames(m)[colSums(is.na(m)) > 0])
-      }
-    }
-  }
+            df[i, "rank_of_square"] <- mod[[10]][[2]]
+
+
+    
 }
 
+df <- df %>% 
+  relocate(N, rho_1, rho_2, t_type, t, p_num, s_epsilon_input, s_alpha_input, NA_cols, NA_constant, rank, det_of_square = det, large_coefs, frobenius_norm, rank_of_square
+           ) %>%
+  arrange(N, rho_1, rho_2, t_type, t, p_num, s_epsilon_input) 
 
 kable(df) %>%
   kable_styling() %>%
   row_spec(which(df$NA_cols == 0 & df$large_coefs == 0), background = "lightblue") %>%
+  row_spec(which(df$NA_cols == 1 & df$NA_constant == TRUE), background = "lightgreen") %>%
+  row_spec(which(df$rank < df$N & df$det_of_square != 0), background = "#ff6242") %>%
   scroll_box(height = "500px")
-
 ```
 
 
 
 
+## Revisions
+
+Fix $N=20$, and $\rho_1 \sim Unif(-1, 1)$. Vary $\rho_2$ and $s_{epsilon}$. Try larger $t$, so include $t(N) = 2N^2$.
 
 
+```{r, warning=F, message=F}
+N_list <- c(20)
+p_num_list <- c(1, 5, 10, 15)
+rho_1_list <- c("unif_-1_1")
+rho_2_list <- c("1/N", "unif_-1_1", "zero")
+t_type_list <- c("N", "N-squared", "Larger than N-squared")
+s_epsilon_list <- c(0.05, 0.1, 0.5)
 
+# df of all configurations!
+df <- expand.grid(N = N_list, 
+            p_num = p_num_list, 
+            rho_1 = rho_1_list, 
+            t_type = t_type_list, 
+            rho_2 = rho_2_list, 
+            s_epsilon_input = s_epsilon_list,
+            t = NA, 
+            NA_cols = NA,
+            NA_constant = NA,
+            large_coefs = NA, 
+            det = NA,
+            rank = NA,
+            frobenius_norm = NA,
+            rank_of_square = NA,
+            s_alpha_input = 0)%>%
+  mutate(t = case_when(t_type== "N" ~ N + 2,
+                       t_type== "N-squared" ~ N^2 + N+ 1, 
+                       t_type == "Larger than N-squared" ~ 2*N^2),
+         id = 1:nrow(.))
 
+# loop over df rows for each specification
+for(i in 1:nrow(df)){
+  set.seed(234)
+  # compute rho1 values
+  rho_1_value <- if(df[i, "rho_1"] == "unif_-1_1"){
+     runif(df[i, "N"], -1, 1)
+  }
+  
+  set.seed(235)
+  # compute rho2 values
+  rho_2_value <- if(df[i, "rho_2"] == "1/N"){
+     1/(df[i, "N"])
+  } else if(df[i, "rho_2"] == "unif_-1_1"){
+     runif(df[i, "N"], -1, 1)
+  } else if(df[i, "rho_2"] == "zero"){
+    0
+  }
+  
+  # get model
+  mod <- models(n = df[i, "N"], t = df[i, "t"], 
+              rho_1_mod = rho_1_value, 
+              rho_2_mod=rho_2_value, 
+              p_num = df[i, "p_num"], 
+              s_alpha_input = 0, 
+              s_epsilon_input = df[i, "s_epsilon_input"])
 
+  m <- mod[[4]][[2]]
+  class(m) <- "numeric"
+      
+  # number of large coefficients
+  df[i, "large_coefs"] <- sum(abs(m)> 10, na.rm = T)
 
+  # number of NA columns
+  df[i, "NA_cols"] <- length(colnames(m)[colSums(is.na(m)) > 0])
+  
+  # is the constant column = NA, if NA_cols = 1
+  df[i, "NA_constant"] <- sum(is.na(m[, "const"])) == length(m[, "const"])
+  # det of Y[1:n, 1:n]
+    df[i, "det"] <- round(mod[[6]][[2]], 20)
 
+    # full Y matrix rank
+  df[i, "rank"] <-  mod[[7]][[2]][1]
+  
+  df[i, "frobenius_norm"] <- round(mod[[9]][[2]], 10)
+            
+      df[i, "rank_of_square"] <- mod[[10]][[2]]
+
+}
+
+df <- df %>% 
+  relocate(N, rho_1, rho_2, t_type, t, p_num, s_epsilon_input, s_alpha_input, NA_cols, NA_constant, rank, det_of_square = det, large_coefs, frobenius_norm, rank_of_square) %>%
+  arrange(N, rho_1, rho_2, t_type, t, p_num, s_epsilon_input) 
+
+kable(df) %>%
+  kable_styling() %>%
+  row_spec(which(df$NA_cols == 0 & df$large_coefs == 0), background = "lightblue") %>%
+  row_spec(which(df$NA_cols == 1 & df$NA_constant == TRUE), background = "lightgreen") %>%
+  row_spec(which(df$rank < 20 & df$det_of_square != 0), background = "#ff6242") %>%
+  scroll_box(height = "500px")
+```
+
+# Other
+
+## Capacity of VAR
+
+Two Cross Validated links:
+[How many endogenous variables in a VAR model with 120 observations?](https://stats.stackexchange.com/questions/234975/how-many-endogenous-variables-in-a-var-model-with-120-observations)
+
+[VAR model: many parameters, but short time series](https://stats.stackexchange.com/questions/203018/var-model-many-parameters-but-short-time-series)
+
+## Packages Other than VAR
+
+[A curated list of Vector Autoregression resources.](https://github.com/kvasilopoulos/awesome-var)
+
+- I looked into some of the R packages, but didn't find any that claimed to speed up run time/fix NA problem etc. Also I am not sure exactly what I am looking for.
+
+- Note BigVAR not on this list so it might be a bit outdated (posted in 2021).
+
+I found a package called fastVAR but it's (1) been removed from CRAN and (2) it has not been updated in 10 years so I am suspicious of it [Github link](https://github.com/jeffwong/fastVAR). The author was at some point [affiliated with Stanford](http://www2.uaem.mx/r-mirror/web/packages/fastVAR/fastVAR.pdf). 
