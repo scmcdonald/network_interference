@@ -13,208 +13,214 @@ library(Matrix)
 ```
 
 
-Least Squares 
+
 
 $$y^{(t + 1)} = A y^{(t)}$$
 
-Let's start with our matrix $Y$. 
+
+$$Y_v = F_Y A_v \implies \begin{bmatrix}
+ y^{(1)} \\
+  y^{(2)} \\
+  \vdots \\
+   y^{(t)}
+\end{bmatrix} = \begin{bmatrix}
+ f(y^{(0)} ) \\
+  f(y^{(1)} ) \\
+  \vdots \\
+   f(y^{(t-1)} )
+\end{bmatrix}A_v$$
+
+
+$$Y_v \in \mathbb{R}^{(t-1)n \times 1}$$
+
+$$F_Y \in \mathbb{R}^{(t-1)n \times n^2}$$
+
+$$A_v \in \mathbb{R}^{n^2 \times 1}$$
+
+Least Squares Solution:
+
+$$A_v  = (F_Y^T F_Y)^{-1}F_Y^T Y_v$$
 
 
 ```{r}
-N = 10
-s_epsilon = 0
-s_alpha = 0
-s_beta = 0
+### Data Generating Process ###
+dgp <- function(N, periods, s_epsilon, s_alpha, s_beta, p_num, rho_1, rho_2, y_initial){
+
+  p = p_num/N
   
-p = 3/N
+  alpha = rnorm(N, mean = 0, sd = s_alpha)
+  beta = rnorm(N, mean = 0, sd = s_beta)
+  epsilon = rnorm(N, mean = 0, sd = s_epsilon)
   
-#rho_1 = rnorm(N, 0, 1)
-rho_1 = seq(1/N, 1, 1/N)
-rho_2 = 0
-  
-alpha = rnorm(N, mean = 0, sd = s_alpha)
-  
-  # beta is the same as time dimension, for each time stamp there is a time value, when we eventually turn it on
-beta = rnorm(N, mean = 0, sd = s_beta)
-epsilon = rnorm(N, mean = 0, sd = s_epsilon)
-  
-G <- erdos.renyi.game(N, p, type=c("gnp"), directed = FALSE, loops = F) %>%
-    as_adjacency_matrix(sparse = F)
-  
-periods = 111
+  G <- erdos.renyi.game(N, p, type=c("gnp"), directed = FALSE, loops = F) %>%
+      as_adjacency_matrix(sparse = F)
 
-Y <- matrix(nrow = N, ncol = periods + 1)
-colnames(Y) <- 0:periods
+  Y <- matrix(nrow = N, ncol = periods + 1)
+  colnames(Y) <- 0:periods
 
-Y[, "0"] <- rnorm(N, mean = 1, sd = 0.001)
+  Y[, "0"] <- y_initial
 
-for(t1 in 1:periods){
-  
-  t = t1 - 1
-  
-  y_t <- Y[, paste(t)]
-  
-  y_t1 <- alpha + beta + rho_1 * y_t + (rho_2 * G %*% y_t )+ epsilon
-  
-  Y[, paste(t1)] <- y_t1
-  
-}
-
-identity = diag(N)
-
-comparison_matrix = ((rho_1 * identity) +( rho_2 *G))
-
-
-rankMatrix(Y)
-```
-
-
-
-
-Pick some $t+1$. Call it t+1 = 60
-
-This is our equation
-
-$$y^{(60)} = Ay^{(59)}$$
-
-
-All Ys might be the same
-
-
-```{r}
-F_T <- c()
-for(j in 1:periods){
-  
-  t = Y[, paste(j)]
-  
-  f_t <- matrix(NA, ncol = N*N, nrow = N)
-  for(i in 1:N){
-    f_t[i, ]<- c(rep(rep(0, N), i-1), t(t), rep(rep(0, N), N-i))
-
+  for(t1 in 1:periods){
+    
+    t = t1 - 1
+    
+    y_t <- Y[, paste(t)]
+    
+    y_t1 <- alpha + beta + rho_1 * y_t + (rho_2 * G %*% y_t )+ epsilon
+    
+    Y[, paste(t1)] <- y_t1
+    
   }
-  F_T <- rbind(F_T, f_t)
+
+  identity = diag(N)
+  
+  comparison_matrix = ((rho_1 * identity) +( rho_2 *G))
+
+  return(list(Y = Y, N = N, periods = periods, rankY = rankMatrix(Y)[1]))
 
 }
-
-
-
-
-
-
-
-t <- Y[, "2"]
-t_plus_1 <- Y[, "3"]
-t_plus_2 <- Y[, "4"]
-t_plus_3 <- Y[, "5"]
-t_plus_4 <- Y[, "6"]
-t_plus_5 <- Y[, "7"]
-t_plus_6 <- Y[, "8"]
-t_plus_7 <- Y[, "9"]
-t_plus_8 <- Y[, "10"]
-t_plus_9 <- Y[, "11"]
-t_plus_10 <- Y[, "12"]
-t_plus_11 <- Y[, "13"]
-t_plus_12 <- Y[, "14"]
-
-
-f_t <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t[i, ]<- c(rep(rep(0, N), i-1), t(t), rep(rep(0, N), N-i))
-
-}
-
-f_t_2 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_2[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_1), rep(rep(0, N), N-i))
-
-}
-
-
-
-f_t_3 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_3[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_2), rep(rep(0, N), N-i))
-
-}
-
-f_t_4 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_4[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_3), rep(rep(0, N), N-i))
-
-}
-
-f_t_5 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_5[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_4), rep(rep(0, N), N-i))
-
-}
-
-f_t_6 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_6[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_5), rep(rep(0, N), N-i))
-
-}
-
-
-f_t_7 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_7[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_6), rep(rep(0, N), N-i))
-
-}
-
-f_t_8 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_8[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_7), rep(rep(0, N), N-i))
-
-}
-
-
-f_t_9 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_9[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_8), rep(rep(0, N), N-i))
-
-}
-
-f_t_10 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_10[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_9), rep(rep(0, N), N-i))
-
-}
-
-
-f_t_11 <- matrix(NA, ncol = N*N, nrow = N)
-for(i in 1:N){
-  f_t_11[i, ]<- c(rep(rep(0, N), i-1), t(t_plus_10), rep(rep(0, N), N-i))
-
-}
-
-
-
-Y_v = rbind(t_plus_1, t_plus_2, t_plus_3, t_plus_4, 
-          t_plus_5, t_plus_6, t_plus_7, t_plus_8, t_plus_9, 
-          t_plus_10, t_plus_11, t_plus_12)
-
-
-Y_v_c = cbind(t_plus_1, t_plus_2, t_plus_3, t_plus_4, 
-          t_plus_5, t_plus_6, t_plus_7, t_plus_8, t_plus_9, 
-          t_plus_10, t_plus_11, t_plus_12)
-
-F_Y  = rbind(f_t, f_t_2, f_t_3, f_t_4, f_t_5, f_t_6, 
-             f_t_7, f_t_8, f_t_9, f_t_10, f_t_11)
-
-A = solve(t(F_Y) %*% F_Y) %*% t(F_Y) %*% Y_v
-
-rankMatrix(t(F_Y) %*% F_Y)
-dim(F_Y)
-s <- svd(F_Y)
-summary(s$d)
-
-s2 <- svd(Y_v_c)
-summary(s2$d[1:N])
-s2$d[1:N]
 ```
 
-at least 10 Ys
+```{r}
+### Least Squares ###
+least_squares <- function(Y){
+  
+  N <- dim(Y)[1]
+  periods <- dim(Y)[2] - 1
+  
+  F_Y <- c()
+  Y_v <- c()
+  
+  for(i in 1:periods){
+    t <- Y[, paste(i - 1)]
+    
+    f_t <- matrix(NA, ncol = N*N, nrow = N)
+    
+    for(j in 1:N){
+      f_t[j, ]<- c(rep(rep(0, N), j-1), t(t), rep(rep(0, N), N-j))
+    }
+    
+    F_Y <- rbind(F_Y, f_t)
+  
+    Y_v <- rbind(Y_v, t(t(Y[, paste(i)])))
+  
+  }
+  
+  
+  A = solve(t(F_Y) %*% F_Y) %*% t(F_Y) %*% Y_v
+  
+  return(A)
+  
+}
+
+```
+
+
+These two work:
+
+1) $\rho_1  = seq(1/N, 1, 1/N)$
+
+2) $\rho_1  \sim Unif(-1, 1)$
+
+
+These two do not work:
+
+3) $\rho_1  \sim N(0, 1)$
+
+4) $\rho_1  \sim N(0.1, 1)$
+
+The generated Y matrix for these are not full rank.
+
+
+
+
+
+```{r, error=TRUE}
+N = 10
+output <- dgp(N = N, 
+          periods = 111, 
+          p_num = 3, 
+          s_epsilon = 0, 
+          s_alpha =  0, 
+          s_beta = 0, 
+          rho_1 = seq(1/N, 1, 1/N), 
+          rho_2 = 0, 
+          y_initial = rnorm(N, mean = 0, sd = 1)
+          )
+
+output$rankY
+ A <- least_squares(Y = output$Y)
+
+
+N = 10
+output <- dgp(N = N, 
+          periods = 111, 
+          p_num = 3, 
+          s_epsilon = 0, 
+          s_alpha =  0, 
+          s_beta = 0, 
+          rho_1 = runif(N, -1, 1), 
+          rho_2 = 0, 
+          y_initial = rnorm(N, mean = 0, sd = 1)
+          )
+output$rankY
+ A <- least_squares(Y = output$Y)
+
+
+N = 10
+output <- dgp(N = N, 
+          periods = 111, 
+          p_num = 3, 
+          s_epsilon = 0, 
+          s_alpha =  0, 
+          s_beta = 0, 
+          rho_1 = rnorm(N, 0, 1), 
+          rho_2 = 0, 
+          y_initial = rnorm(N, mean = 0, sd = 1)
+          )
+output$rankY
+A <- least_squares(Y = output$Y)
+
+
+N = 10
+output <- dgp(N = N, 
+          periods = 111, 
+          p_num = 3, 
+          s_epsilon = 0, 
+          s_alpha =  0, 
+          s_beta = 0, 
+          rho_1 = rnorm(N, 0.1, 1), 
+          rho_2 = 0, 
+          y_initial = rnorm(N, mean = 0, sd = 1)
+          )
+output$rankY
+A <- least_squares(Y = output$Y)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#rankMatrix(t(F_Y) %*% F_Y)
+#dim(F_Y)
+#s <- svd(F_Y)
+#summary(s$d)
+```
+
+
 
 
 
