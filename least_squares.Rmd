@@ -60,6 +60,7 @@ unif(-1,1)
 norm(0.1, 1)
 seq(1/N, 1, 1/N)
 zero
+depends on rho_1
 
 YInitiial
 standard normal
@@ -69,20 +70,29 @@ zero
 ```{r}
 ### Data Generating Process ###
 dgp <- function(N, periods_type, s_epsilon, s_alpha, s_beta, p_num, rho_1, rho_2, y_initial, seed){
-    x = seed
+  x = seed
+  
+  ## Generate the graph ##
   p_num_value <- if(p_num == "low"){
     N * .2
   } else if(p_num == "high"){
     N * .8
   }
   
+  p = p_num_value/N
   
+  set.seed(6*x + 7)
+  G <- erdos.renyi.game(N, p, type=c("gnp"), directed = FALSE, loops = F) %>%
+    as_adjacency_matrix(sparse = F)
+  
+  ## Specify the number of time periods ##
   periods <- if(periods_type == "squared"){
     N^2 + N + 1
   } else if(periods_type == "plus2"){
     N + 2
   }
   
+  d_max = max(rowSums(G))
   
   set.seed(x)
   rho_1_values <- if(grepl("unif", rho_1)){
@@ -106,17 +116,15 @@ dgp <- function(N, periods_type, s_epsilon, s_alpha, s_beta, p_num, rho_1, rho_2
     seq(1/N, 1, 1/N)
   } else if(rho_2 == "zero"){
     rep(0, N)
-  }
+  } else if(rho_2 == "depends on rho_1"){
+    (1-rho_1)/d_max - 0.01
+  }else if (is.numeric(rho_2)){
+    rho_2
+  } 
   
-  set.seed(2*x + 7)
-  y_initial_values <- if(y_initial == "standard normal"){
-    rnorm(N, 0, 1)
-  } else if(y_initial == "zero"){
-    rep(0, N)
-  }
-  
-  p = p_num_value/N
-  
+
+
+  ## determine alpha, beta, and epsilon ##
   set.seed(3*x + 7)
   alpha = rnorm(N, mean = 0, sd = s_alpha)
   
@@ -126,15 +134,21 @@ dgp <- function(N, periods_type, s_epsilon, s_alpha, s_beta, p_num, rho_1, rho_2
   set.seed(5*x + 7)
   epsilon = rnorm(N, mean = 0, sd = s_epsilon)
   
-  set.seed(6*x + 7)
-  G <- erdos.renyi.game(N, p, type=c("gnp"), directed = FALSE, loops = F) %>%
-      as_adjacency_matrix(sparse = F)
-
+  
+  ## Generate Y ##
+  
+  set.seed(2*x + 7)
+  y_initial_values <- if(y_initial == "standard normal"){
+    rnorm(N, 0, 1)
+  } else if(y_initial == "zero"){
+    rep(0, N)
+  }
+  
   Y <- matrix(nrow = N, ncol = periods + 1)
   colnames(Y) <- 0:periods
-
+  
   Y[, "0"] <- y_initial_values
-
+  
   for(t1 in 1:periods){
     
     t = t1 - 1
@@ -146,19 +160,21 @@ dgp <- function(N, periods_type, s_epsilon, s_alpha, s_beta, p_num, rho_1, rho_2
     Y[, paste(t1)] <- y_t1
     
   }
-
+  
   comparison_matrix = (diag(N) + G)
-
+  
   return(list(Y = Y, N = N, periods = periods, periods_type = periods_type, rankY = rankMatrix(Y)[1],
               s_epsilon = s_epsilon, 
               s_alpha = s_alpha,
               s_beta = s_beta, 
               p_num = p_num, 
               rho_1 = rho_1, 
-              rho_2 = rho_2, 
+              rho_2 = rho_2_values, 
+              d_max = d_max,
               y_initial = y_initial, seed = seed, 
-              comparison_matrix = comparison_matrix))
-
+              comparison_matrix = comparison_matrix, 
+              G=G))
+  
 }
 ```
 
@@ -345,8 +361,6 @@ g_theta <- function(matrix, theta){
   ifelse(abs(matrix) > theta, 1, 0)
 }
 
-
-  
 # difference
 disagreements <- function(original,estimate, N){
   return(sum(abs(original - estimate) == 1)/N^2)
@@ -357,7 +371,7 @@ disagreements <- function(original,estimate, N){
 ### Ridge
 ```{r}
 ### Ridge ###
-ridge <- function(output, lambda){
+ridge <- function(output, lambda, theta){
   
   Y<- output$Y
   
@@ -390,13 +404,13 @@ ridge <- function(output, lambda){
   error <- ifelse(sum(ifelse(class(A) == "try-error", 1, 0)) >0, "error", "no error")
   error_message <- ifelse(error  == "error", paste(attributes(A)$condition), "")
 
-  dis <- disagreements(output$comparison_matrix, g_theta(A, theta = 0.1), output$N)
+  dis <- disagreements(output$comparison_matrix, g_theta(A, theta = theta), output$N)
 
   diagnostics <- rbind(N= output$N, periods = output$periods_type, rankY = output$rankY, 
                        s_alpha = output$s_alpha,s_epsilon =  output$s_epsilon, 
                        s_beta = output$s_beta, p_num = output$p_num, rho_1 = output$rho_1, 
                        rho_2 = output$rho_2, y_initial = output$y_initial, error = error, 
-                       error_message = error_message, seed = output$seed, lambda = lambda, 
+                       error_message = error_message, seed = output$seed, lambda = lambda, theta = theta,
                        disagreements = dis)
 
   return(list(A = A, diagnostics = diagnostics, comparison_matrix = output$comparison_matrix))
@@ -406,7 +420,7 @@ ridge <- function(output, lambda){
 ```
 
 
-```{r, cache = T}
+```{r, eval = F, include = F}
 N = c(15)
 period_type = c("squared", "plus2")
 p_num = c("low", "high")
@@ -446,7 +460,7 @@ for(i in 1:nrow(tests)){
             y_initial = tests[i, "y_initial"], 
             seed = j)
     
-    ls_out <- ridge(output, lambda = tests[i, "lambda"])
+    ls_out <- ridge(output, lambda = tests[i, "lambda"], theta = 0.01)
   
     final_seed_test <-rbind(final_seed_test, cbind(t(ls_out$diagnostics)))
     
@@ -456,7 +470,7 @@ for(i in 1:nrow(tests)){
 ```
 
 
-```{r}
+```{r, eval = F, include = F}
 error_rate_ridge <- final_seed_test %>%
   group_by(N, periods, s_alpha, s_epsilon, s_beta, p_num, rho_1, rho_2, y_initial, error, lambda) %>%
   mutate(ave_dis = as.character(mean(as.numeric(disagreements)))) %>%
@@ -470,7 +484,7 @@ error_rate_ridge <- final_seed_test %>%
 ```
 
 
-```{r}
+```{r, eval = F, include = F}
 error_final  <- merge(error_rate, error_rate_ridge, by = c("N", "periods", 
                                            "s_alpha", "s_beta", "s_epsilon", "p_num", "rho_1", "rho_2", "y_initial"))
 
@@ -485,26 +499,58 @@ error_final %>%
 ```
 
 
+```{r, cache = T}
+N = 15
+periods_type =c("squared", "plus2")
+s_alpha = c(0, 0.2)
+s_beta = c(0, 0.2)
+s_epsilon = c(0, 0.2)
+rho_1 = c(0.2, 0.6)
+y_initial = c("standard normal", "zero")
+p_num = c("low", "high")
+theta = c(0.01,  0.0001)
+lambda = c(0.01,  0.0001)
 
+
+tests <- expand.grid(N = N, 
+                     periods_type = periods_type, 
+                     s_alpha = s_alpha, 
+                     s_beta = s_beta,
+                     s_epsilon = s_epsilon, 
+                     rho_1 = rho_1,
+                     y_initial = y_initial, 
+                     p_num = p_num,theta= theta,
+                     lambda = lambda,
+                     theta= theta,
+            stringsAsFactors = F)
+
+final <- data.frame()
+for(i in 1:nrow(tests)){
+  
+  output <- dgp(N = tests[i, "N"], 
+          periods_type = tests[i, "periods_type"], 
+          p_num = tests[i, "p_num"], 
+          s_epsilon = tests[i, "s_epsilon"],  
+          s_alpha =  tests[i, "s_alpha"], 
+          s_beta = tests[i, "s_beta"], 
+          rho_1 = tests[i, "rho_1"],  
+          rho_2 = "depends on rho_1",
+          y_initial = tests[i, "y_initial"], 
+          seed = 1
+  )
+  
+  out <- ridge(output = output, lambda = tests[i, "lambda"], theta = tests[i, "theta"])
+
+  final <- rbind(final, t(out$diagnostics))
+  
+  
+}
+```
 
 ```{r}
-N = 20
-output <- dgp(N= N, 
-              periods_type = "squared", 
-              s_alpha = 0.2, s_beta = 0, s_epsilon = 0.3, 
-              rho_1 = "unif(.9, 1)", rho_2 = "zero", 
-              y_initial = "standard normal", seed = 1, 
-              p_num = "low")
-
-out <- ridge(output = output, lambda = 0.000001)
-out$diagnostics
+options(DT.options = list(pageLength = 100))
+final %>% 
+  datatable() 
 ```
 
 
-
-```{r, include = F}
-#rankMatrix(t(F_Y) %*% F_Y)
-#dim(F_Y)
-#s <- svd(F_Y)
-#summary(s$d)
-```
