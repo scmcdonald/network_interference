@@ -1,8 +1,13 @@
 ---
 title: "Disagreements"
 author: "Sarah McDonald"
-date: "9/14/2022"
-output: html_document
+date: "Updated: `r format(Sys.Date(), format='%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 6
+    number_sections: yes
+    toc_float: yes
 ---
 
 ```{r setup, include=FALSE}
@@ -11,6 +16,8 @@ library(igraph)
 library(tidyverse)
 library(Matrix)
 library(DT)
+library(foreach)
+library(doParallel)
 ```
 
 
@@ -273,35 +280,43 @@ tests <- expand.grid(N = N,
                      lambda = lambda,
                      theta= theta,
             stringsAsFactors = F)
+```
 
-final <- data.frame()
-for(i in 1:nrow(tests)){
- #for(i in 1:100){
- 
+
+
+```{r}
+cl <- parallel::makeCluster(3)
+doParallel::registerDoParallel(cl)
+tbl <- foreach(i = 1:nrow(tests), .combine = rbind, .packages=c('tidyverse', 'igraph', 'Matrix')) %dopar% {
+  
   output <- dgp(N = tests[i, "N"], 
-          periods_type = tests[i, "periods_type"], 
-          p_num = tests[i, "p_num"], 
-          s_epsilon = tests[i, "s_epsilon"],  
-          s_alpha =  tests[i, "s_alpha"], 
-          s_beta = tests[i, "s_beta"], 
-          rho_1 = tests[i, "rho_1"],  
-          rho_2 = "depends on rho_1",
-          y_initial = tests[i, "y_initial"], 
-          seed = 1
+                periods_type = tests[i, "periods_type"], 
+                p_num = tests[i, "p_num"], 
+                s_epsilon = tests[i, "s_epsilon"],  
+                s_alpha =  tests[i, "s_alpha"], 
+                s_beta = tests[i, "s_beta"], 
+                rho_1 = tests[i, "rho_1"],  
+                rho_2 = "depends on rho_1",
+                y_initial = tests[i, "y_initial"], 
+                seed = 1
   )
   
   out <- ridge(output = output, lambda = tests[i, "lambda"], theta = tests[i, "theta"])
-
-  final <- rbind(final, t(out$diagnostics))
   
+  final <- t(out$diagnostics)
+  
+  return(final)
   
 }
+parallel::stopCluster(cl)
 ```
 
 
 ```{r}
-options(DT.options = list(pageLength = 100))
-final %>% 
+tbl <- as.data.frame(tbl)
+
+options(DT.options = list(pageLength = 25))
+tbl %>% 
   datatable() 
 ```
 
@@ -310,7 +325,7 @@ final %>%
 ## Relationship between Original Disagreement and Sarah's Disagreement
 
 ```{r}
-plot(final$disagreements, final$disagreements2)
+plot(tbl$disagreements, tbl$disagreements2)
 ```
 
 
@@ -322,7 +337,7 @@ Note that this follows high (0.8) and low (0.2) $p_{numerator}$. In all cases wh
 
 
 ```{r}
-final %>%
+tbl %>%
   select(N, periods, rankY, s_alpha, s_epsilon, s_beta, p_num, rho_1, rho_2, y_initial, lambda, theta, disagreements) %>%
   pivot_wider(names_from = theta, values_from = disagreements, names_prefix = "dis1_") %>%
   mutate(best_theta = case_when(dis1_0.1 > dis1_0.001 ~ "0.001", 
@@ -336,8 +351,6 @@ final %>%
 ## What if we make theta more extreme?
 
 Now, let's try 1 and 0.0001
-
-
 
 ```{r, cache = T}
 N = 15
@@ -363,54 +376,68 @@ tests2 <- expand.grid(N = N,
                      lambda = lambda,
                      theta= theta,
             stringsAsFactors = F)
+```
 
-final2 <- data.frame()
-for(i in 1:nrow(tests2)){
- #for(i in 1:100){
- 
+
+
+```{r}
+cl <- parallel::makeCluster(3)
+doParallel::registerDoParallel(cl)
+tbl2 <- foreach(i = 1:nrow(tests2), .combine = rbind, .packages=c('tidyverse', 'igraph', 'Matrix')) %dopar% {
+  
   output <- dgp(N = tests2[i, "N"], 
-          periods_type = tests2[i, "periods_type"], 
-          p_num = tests2[i, "p_num"], 
-          s_epsilon = tests2[i, "s_epsilon"],  
-          s_alpha =  tests2[i, "s_alpha"], 
-          s_beta = tests2[i, "s_beta"], 
-          rho_1 = tests2[i, "rho_1"],  
-          rho_2 = "depends on rho_1",
-          y_initial = tests2[i, "y_initial"], 
-          seed = 1
+                periods_type = tests2[i, "periods_type"], 
+                p_num = tests2[i, "p_num"], 
+                s_epsilon = tests2[i, "s_epsilon"],  
+                s_alpha =  tests2[i, "s_alpha"], 
+                s_beta = tests2[i, "s_beta"], 
+                rho_1 = tests2[i, "rho_1"],  
+                rho_2 = "depends on rho_1",
+                y_initial = tests2[i, "y_initial"], 
+                seed = 1
   )
   
   out <- ridge(output = output, lambda = tests2[i, "lambda"], theta = tests2[i, "theta"])
-
-  final2 <- rbind(final2, t(out$diagnostics))
   
+  final <- t(out$diagnostics)
+  
+  return(final)
   
 }
+parallel::stopCluster(cl)
 ```
 
+
 ```{r}
-final_df <- rbind(final, final2)
-test <- final_df %>%
+tbl2 <- as.data.frame(tbl2)
+tbl2 %>% 
+  datatable() 
+```
+
+
+```{r}
+final_df <- rbind(tbl, tbl2)
+final_summ <- final_df %>%
   select(N, periods, rankY, s_alpha, s_epsilon, s_beta, p_num, rho_1, rho_2, y_initial, lambda, theta, disagreements) %>%
+  arrange(theta) %>%
   pivot_wider(names_from = theta, values_from = disagreements, names_prefix = "dis1_") %>%
   mutate(dis1_0.1 = as.numeric(dis1_0.1), 
          dis1_1 = as.numeric(dis1_1), 
          dis1_0.001 = as.numeric(dis1_0.001), 
-         `dis1_1e-04` = as.numeric(`dis1_1e-04`))
+         `dis1_1e-04` = as.numeric(`dis1_1e-04`))  %>%
+  relocate( `dis1_1e-04`, .before = dis1_0.001)
 
 
-best <- apply(X = test[, c("dis1_0.1", "dis1_0.001", "dis1_1", "dis1_1e-04")], MARGIN = 1, FUN =function(x){ which(x == min(x))}) %>%
-  as.matrix %>%
-  as.data.frame() %>%
-  rename(best_theta = V1)  %>%
-  mutate(best_theta = as.character(best_theta))
+best <- apply(X = final_summ[, c("dis1_1e-04",  "dis1_0.001", "dis1_0.1","dis1_1")], MARGIN = 1, FUN =function(x){ which(x == min(x))}) %>%
+  lapply(., names)
 
+final_summ$`min_1e-04` <- sapply(best, function(x)is.element("dis1_1e-04", x), simplify = T) %>% as.numeric
+final_summ$`min_0.001` <- sapply(best, function(x)is.element("dis1_0.001", x), simplify = T) %>% as.numeric
+final_summ$`min_0.1` <- sapply(best, function(x)is.element("dis1_0.1", x), simplify = T) %>% as.numeric
+final_summ$`min_1` <- sapply(best, function(x)is.element("dis1_1", x), simplify = T) %>% as.numeric
 
-final_df <- cbind(final_df, best) 
-
-
-final_df%>%
-  group_by(best_theta, p_num) %>%
+final_summ %>%
+  group_by(min_1, min_0.1, min_0.001, `min_1e-04`, p_num) %>%
   count()
 ```
 
